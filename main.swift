@@ -273,6 +273,8 @@ final class Prefs: ObservableObject {
         didSet { try? atLogin ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
     }
     @Published var setUp = Folders.isSetUp
+    /// macOS saved a screenshot to the Desktop even though another folder is chosen.
+    @Published var desktopFallback = false
 
     init() {
         d.register(defaults: ["copyHotkey": true, "plainBacktick": false])
@@ -453,9 +455,8 @@ final class Router {
 
 final class Watcher {
     private let onNew: (URL) -> Void
-    private var source: DispatchSourceFileSystemObject?
-    private var folder: URL?
-    private var known: Set<String> = []
+    private var sources: [URL: DispatchSourceFileSystemObject] = [:]
+    private var known: [URL: Set<String>] = [:]
     private var timer: Timer?
 
     init(onNew: @escaping (URL) -> Void) { self.onNew = onNew }
@@ -465,40 +466,46 @@ final class Watcher {
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.attach() }
     }
 
-    /// (Re)watch the folder macOS currently saves screenshots to.
+    /// Watch where macOS says it saves screenshots, plus the Desktop: macOS falls back to the
+    /// Desktop when it isn't allowed to write to the chosen folder.
+    private var folders: Set<URL> { [Folders.screenshotLocation.standardizedFileURL, Folders.desktop.standardizedFileURL] }
+
     private func attach() {
-        let loc = Folders.screenshotLocation
-        if loc == folder { return }
-        source?.cancel(); source = nil
-        folder = loc
-        // Listing a protected folder (like Desktop) can wait on a macOS permission prompt,
-        // so do it off the main thread to keep the app responsive.
-        DispatchQueue.global(qos: .userInitiated).async {
-            let names = Set(self.list(loc))
-            let fd = open(loc.path, O_EVTONLY)
-            DispatchQueue.main.async {
-                guard self.folder == loc, fd >= 0 else { if fd >= 0 { close(fd) }; return }
-                self.known = names
-                let s = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
-                s.setEventHandler { [weak self] in self?.scan() }
-                s.setCancelHandler { close(fd) }
-                s.resume()
-                self.source = s
-                Prefs.shared.refreshSetup()
+        let want = folders
+        for (u, s) in sources where !want.contains(u) { s.cancel(); sources[u] = nil; known[u] = nil }
+        for loc in want where sources[loc] == nil && known[loc] == nil {
+            known[loc] = []  // marks "attaching" so we don't start twice
+            // Listing a protected folder (like Desktop) can wait on a macOS permission prompt,
+            // so do it off the main thread to keep the app responsive.
+            DispatchQueue.global(qos: .userInitiated).async {
+                let names = Set(self.list(loc))
+                let fd = open(loc.path, O_EVTONLY)
+                DispatchQueue.main.async {
+                    guard fd >= 0 else { self.known[loc] = nil; return }
+                    self.known[loc] = names
+                    let s = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+                    s.setEventHandler { [weak self] in self?.scan(loc) }
+                    s.setCancelHandler { close(fd) }
+                    s.resume()
+                    self.sources[loc] = s
+                }
             }
         }
+        Prefs.shared.refreshSetup()
     }
 
     private func list(_ u: URL) -> [String] { (try? FileManager.default.contentsOfDirectory(atPath: u.path)) ?? [] }
 
-    private func scan() {
-        guard let folder else { return }
+    private func scan(_ folder: URL) {
         let now = list(folder)
-        let new = now.filter { !known.contains($0) }
-        known = Set(now)
+        let new = now.filter { !(known[folder] ?? []).contains($0) }
+        known[folder] = Set(now)
         for name in new where Watcher.isScreenshot(name) {
             let url = folder.appendingPathComponent(name)
             if Router.shared.written.contains(url.path) { continue }
+            let onDesktop = folder == Folders.desktop.standardizedFileURL
+            let wantsElsewhere = Folders.screenshotLocation.standardizedFileURL != Folders.desktop.standardizedFileURL
+            Prefs.shared.desktopFallback = onDesktop && wantsElsewhere
             whenStable(url) { [weak self] in self?.onNew(url) }
         }
     }
@@ -926,7 +933,7 @@ struct ShelfView: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
 
-            if !prefs.setUp { setupBanner }
+            if !prefs.setUp { setupBanner } else if prefs.desktopFallback { fallbackBanner }
 
             Divider()
 
@@ -970,6 +977,18 @@ struct ShelfView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.accentColor.opacity(0.12))
+    }
+
+    var fallbackBanner: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("macOS is still saving screenshots to your Desktop").font(.system(size: 12, weight: .semibold))
+            Text("Screenshot Dock still catches them, but to keep your Desktop clear, choose the folder once in Apple's screenshot menu: press ⌘⇧5 → Options → Other Location… → open your home folder → Screenshots → Inbox → Choose.")
+                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button("Open the Inbox folder in Finder") { NSWorkspace.shared.open(Folders.inbox) }.font(.system(size: 11))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.14))
     }
 
     var empty: some View {
