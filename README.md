@@ -10,6 +10,8 @@ A Mac app that keeps screenshots off your Desktop and one click away in the Dock
 
 After each screenshot, press a number (or click). If you do nothing for 6 seconds, it goes to **Random**.
 
+Taking several screenshots in a row? While the bar is showing, each new one joins the same batch (the bar shows a count and the timer restarts), and one choice files them all.
+
 | Key | Category | Where it goes |
 |---|---|---|
 | **1** | Remember | Your Desktop, and pinned on the shelf |

@@ -599,7 +599,7 @@ func screenUnderMouse() -> NSScreen {
 // MARK: - Quick-choice bar
 
 final class ChoiceModel: ObservableObject {
-    @Published var image: NSImage?
+    @Published var images: [NSImage] = []
     @Published var remaining: Double = 1
     var hovering = false
 }
@@ -610,39 +610,35 @@ final class ChoiceBar {
 
     let model = ChoiceModel()
     private var panel: FloatingPanel?
-    private var queue: [URL] = []
-    private var current: URL?
+    /// Screenshots taken while the bar is showing join the same batch and share one choice.
+    private var batch: [URL] = []
     private var keyIDs: [UInt32] = []
     private var timer: Timer?
 
     func present(_ url: URL) {
-        queue.append(url)
-        if current == nil { next() }
-    }
-
-    private func next() {
-        guard !queue.isEmpty else { hide(); return }
-        let url = queue.removeFirst()
-        current = url
-        model.image = Thumbs.image(url.path, max: 300)
-        model.remaining = 1
-        show()
-        registerKeys()
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            if !self.model.hovering { self.model.remaining -= 0.05 / ChoiceBar.seconds }
-            if self.model.remaining <= 0 { self.choose(.random) }
+        batch.append(url)
+        if let img = Thumbs.image(url.path, max: 300) { model.images.append(img) }
+        model.remaining = 1  // each new screenshot restarts the countdown
+        if batch.count == 1 {
+            show()
+            registerKeys()
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                if !self.model.hovering { self.model.remaining -= 0.05 / ChoiceBar.seconds }
+                if self.model.remaining <= 0 { self.choose(.random) }
+            }
         }
     }
 
     func choose(_ c: Category) {
-        guard let url = current else { return }
+        guard !batch.isEmpty else { return }
         timer?.invalidate(); timer = nil
         unregisterKeys()
-        current = nil
-        Router.shared.route(url, c)
-        next()
+        for url in batch { Router.shared.route(url, c) }
+        batch = []
+        model.images = []
+        hide()
     }
 
     /// Number keys 1–5 (and Esc for Random) only while the bar is showing.
@@ -680,18 +676,29 @@ struct ChoiceView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Group {
-                    if let img = model.image {
-                        Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        Color.gray.opacity(0.2)
+                ZStack(alignment: .bottomTrailing) {
+                    ZStack {
+                        if model.images.isEmpty { RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.2)) }
+                        ForEach(Array(model.images.suffix(3).enumerated()), id: \.offset) { i, img in
+                            Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
+                                .frame(width: 84, height: 66)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.6), lineWidth: 1))
+                                .shadow(radius: 2)
+                                .offset(x: CGFloat(i) * 4 - 4, y: CGFloat(i) * -4 + 4)
+                        }
+                    }
+                    .frame(width: 92, height: 74)
+                    if model.images.count > 1 {
+                        Text("\(model.images.count)").font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white).padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(Color.accentColor))
+                            .offset(x: 6, y: 6)
                     }
                 }
-                .frame(width: 92, height: 74)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Where should this go?").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                    Text(model.images.count > 1 ? "Where should these \(model.images.count) screenshots go?" : "Where should this go?").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                     HStack(spacing: 6) {
                         ForEach(Category.allCases, id: \.self) { c in
                             Button { ChoiceBar.shared.choose(c) } label: {
