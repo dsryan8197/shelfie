@@ -15,10 +15,10 @@ Taking several screenshots in a row? While the bar is showing, each new one join
 | Key | Category | Where it goes |
 |---|---|---|
 | **1** | Remember | Your Desktop, and pinned on the shelf |
-| **2** | Inspiration | `~/Screenshots/Inspiration` |
-| **3** | Random (default) | `~/Screenshots/Random` |
-| **4** | Records | `~/Screenshots/Records/<year>` |
-| **5** | Photos | Saved to Photos (syncs to your iPhone) and `~/Screenshots/Random` |
+| **2** | Inspiration | `Desktop/screenshots/inspiration` |
+| **3** | Random (default) | `Desktop/screenshots/random` |
+| **4** | Records | `Desktop/screenshots/records/<year>` |
+| **5** | Photos | Saved to Photos (syncs to your iPhone) and `Desktop/screenshots/random` |
 
 ## The shelf
 
@@ -35,7 +35,7 @@ Taking several screenshots in a row? While the bar is showing, each new one join
 
 ## Setup
 
-Open the shelf and click **Set up** once. It points macOS screenshots at `~/Screenshots/Inbox` and turns off the floating thumbnail, so the choice bar appears instantly and nothing lands on your Desktop. Settings has a button to restore Apple's defaults.
+Open the shelf and click **Set up** once. It points macOS screenshots at `~/Screenshots/Inbox` and turns off the floating thumbnail, so the choice bar appears instantly and nothing lands loose on your Desktop. If macOS keeps saving to the Desktop anyway, press ⌘⇧5 → Options → Other Location… and pick `~/Screenshots/Inbox` once. Settings has a button to restore Apple's defaults.
 
 Requires macOS 26 or newer. Names use Apple Intelligence when it's on, and fall back to the screenshot's largest heading when it isn't.
 

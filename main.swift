@@ -56,18 +56,20 @@ enum Category: String, Codable, CaseIterable {
 
 enum Folders {
     static let home = FileManager.default.homeDirectoryForCurrentUser
-    static let base = home.appendingPathComponent("Screenshots")
-    static let inbox = base.appendingPathComponent("Inbox")
     static let desktop = home.appendingPathComponent("Desktop")
+    /// Filed screenshots live in a "screenshots" folder on the Desktop.
+    static let base = desktop.appendingPathComponent("screenshots")
+    /// Where macOS drops new screenshots before they're sorted (kept off the Desktop).
+    static let inbox = home.appendingPathComponent("Screenshots/Inbox")
 
     static func destination(_ c: Category) -> URL {
         switch c {
         case .remember: return desktop
-        case .inspiration: return base.appendingPathComponent("Inspiration")
-        case .random, .photos: return base.appendingPathComponent("Random")
+        case .inspiration: return base.appendingPathComponent("inspiration")
+        case .random, .photos: return base.appendingPathComponent("random")
         case .records:
             let year = Calendar.current.component(.year, from: Date())
-            return base.appendingPathComponent("Records/\(year)")
+            return base.appendingPathComponent("records/\(year)")
         }
     }
 
@@ -1060,7 +1062,7 @@ struct ShelfView: View {
                         .font(.system(size: 11))
                     }
                 }
-                Text("Folders: Remember → Desktop · Inspiration, Random, Records → ~/Screenshots")
+                Text("Folders: Remember → Desktop · Inspiration, Random, Records → Desktop/screenshots")
                     .font(.system(size: 10)).foregroundStyle(.secondary)
                 Divider()
                 Button("Quit Screenshot Dock") { NSApp.terminate(nil) }
