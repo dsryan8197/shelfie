@@ -13,22 +13,23 @@ import FoundationModels
 // MARK: - Categories and folders
 
 enum Category: String, Codable, CaseIterable {
-    case remember, inspiration, random, records, photos
+    // Raw values are stored in shelf.json, so they keep their original names.
+    case remember, random, inspiration, records, photos
 
     var title: String {
         switch self {
-        case .remember: return "Remember"
+        case .remember: return "Desktop"
+        case .random: return "Save"
         case .inspiration: return "Inspiration"
-        case .random: return "Random"
         case .records: return "Records"
         case .photos: return "Photos"
         }
     }
     var icon: String {
         switch self {
-        case .remember: return "pin.fill"
+        case .remember: return "desktopcomputer"
+        case .random: return "tray.and.arrow.down.fill"
         case .inspiration: return "sparkles"
-        case .random: return "tray.fill"
         case .records: return "doc.text.fill"
         case .photos: return "photo.on.rectangle"
         }
@@ -36,17 +37,17 @@ enum Category: String, Codable, CaseIterable {
     var color: Color {
         switch self {
         case .remember: return .orange
+        case .random: return .blue
         case .inspiration: return .purple
-        case .random: return .gray
         case .records: return .green
-        case .photos: return .blue
+        case .photos: return .pink
         }
     }
     var key: Int {
         switch self {
         case .remember: return 1
-        case .inspiration: return 2
-        case .random: return 3
+        case .random: return 2
+        case .inspiration: return 3
         case .records: return 4
         case .photos: return 5
         }
@@ -93,7 +94,7 @@ enum Folders {
         switch c {
         case .remember: return desktop
         case .inspiration: return base.appendingPathComponent("inspiration")
-        case .random, .photos: return base.appendingPathComponent("random")
+        case .random, .photos: return base.appendingPathComponent("save")
         case .records:
             let year = Calendar.current.component(.year, from: Date())
             return base.appendingPathComponent("records/\(year)")
@@ -294,8 +295,6 @@ final class Prefs: ObservableObject {
     private let d = UserDefaults.standard
     private var hotkeyIDs: [UInt32] = []
 
-    /// ⌘2 takes a copy-only screenshot (straight to the clipboard, no file).
-    @Published var copyHotkey: Bool { didSet { d.set(copyHotkey, forKey: "copyHotkey"); applyHotkeys() } }
     /// Shelf hotkey: plain ` instead of ⌥`. Plain ` means the backtick key can't be typed while the app runs.
     @Published var plainBacktick: Bool { didSet { d.set(plainBacktick, forKey: "plainBacktick"); applyHotkeys() } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled {
@@ -311,8 +310,7 @@ final class Prefs: ObservableObject {
     @Published var basePath = Folders.base.path
 
     init() {
-        d.register(defaults: ["copyHotkey": true, "plainBacktick": false])
-        copyHotkey = d.bool(forKey: "copyHotkey")
+        d.register(defaults: ["plainBacktick": false])
         plainBacktick = d.bool(forKey: "plainBacktick")
     }
 
@@ -321,19 +319,9 @@ final class Prefs: ObservableObject {
     func applyHotkeys() {
         hotkeyIDs.forEach { HotKeys.shared.unregister($0) }
         hotkeyIDs = []
-        if copyHotkey {
-            hotkeyIDs.append(HotKeys.shared.register(kVK_ANSI_2, cmdKey) { Prefs.copyOnlyScreenshot() })
-        }
         hotkeyIDs.append(HotKeys.shared.register(kVK_ANSI_Grave, plainBacktick ? 0 : optionKey,
                                                  pressed: { Shelf.shared.peekPressed() },
                                                  released: { Shelf.shared.peekReleased() }))
-    }
-
-    static func copyOnlyScreenshot() {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        p.arguments = ["-i", "-c"]
-        try? p.run()
     }
 
     func refreshSetup() {
@@ -1103,7 +1091,7 @@ struct ShelfView: View {
                     }
                 }
             }
-            Text("Hold \(prefs.shelfKeyLabel) to peek at the shelf · \(prefs.copyHotkey ? "⌘2 copies a screenshot" : "")")
+            Text("Hold \(prefs.shelfKeyLabel) to peek at the shelf")
                 .font(.system(size: 10)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
@@ -1113,7 +1101,6 @@ struct ShelfView: View {
     var settings: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("⌘2 takes a copy-only screenshot (no file)", isOn: $prefs.copyHotkey)
                 VStack(alignment: .leading, spacing: 4) {
                     Picker("Shelf key", selection: $prefs.plainBacktick) {
                         Text("⌥` (Option + backtick)").tag(false)
@@ -1141,7 +1128,7 @@ struct ShelfView: View {
                         Spacer()
                         Button("Change…") { prefs.chooseFolder() }.font(.system(size: 11))
                     }
-                    Text("Remember goes to the Desktop. Inspiration, Random and Records go into this folder.")
+                    Text("Desktop screenshots go loose on the Desktop. Save, Inspiration and Records go into this folder.")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
                 Divider()

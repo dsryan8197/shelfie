@@ -8,21 +8,21 @@ A Mac app that keeps screenshots off your Desktop and one click away in the Dock
 
 ## The quick-choice bar
 
-After each screenshot, press a number (or click). If you do nothing for 6 seconds, it goes to **Random**.
+After each screenshot, press a number (or click). If you do nothing for 6 seconds, it goes to **Save**.
 
 Taking several screenshots in a row? While the bar is showing, each new one joins the same batch (the bar shows a count and the timer restarts), and one choice files them all.
 
 | Key | Category | Where it goes |
 |---|---|---|
-| **1** | Remember | Your Desktop |
-| **2** | Inspiration | `Desktop/screenshots/inspiration` |
-| **3** | Random (default) | `Desktop/screenshots/random` |
+| **1** | Desktop | Loose on your Desktop |
+| **2** | Save (default) | `Desktop/screenshots/save` |
+| **3** | Inspiration | `Desktop/screenshots/inspiration` |
 | **4** | Records | `Desktop/screenshots/records/<year>` |
-| **5** | Photos | Saved to Photos (syncs to your iPhone) and `Desktop/screenshots/random` |
+| **5** | Photos | Saved to Photos (syncs to your iPhone) and `Desktop/screenshots/save` |
 
 ## Your screenshots folder
 
-Inspiration, Random and Records go into a `screenshots` folder on your Desktop. You can move or rename that folder and Screenshot Dock follows it. If it's deleted, new screenshots go to your Desktop and the shelf shows an alert (with a **!** on the Dock icon) so you can choose a new folder. To use a different folder, open the shelf → gear → **Change…**
+Save, Inspiration and Records go into a `screenshots` folder on your Desktop. You can move or rename that folder and Screenshot Dock follows it. If it's deleted, new screenshots go to your Desktop and the shelf shows an alert (with a **!** on the Dock icon) so you can choose a new folder. To use a different folder, open the shelf → gear → **Change…**
 
 ## The shelf
 
@@ -35,7 +35,7 @@ Inspiration, Random and Records go into a `screenshots` folder on your Desktop. 
 
 ## Copy-only screenshots
 
-**⌘2** takes a screenshot straight to the clipboard, with no file, for things you're about to paste. (You can turn this off in settings, since ⌘2 is also "switch to tab 2" in browsers.)
+For screenshots you're about to paste, use macOS's own "Copy picture of selected area to the clipboard" shortcut (System Settings → Keyboard → Keyboard Shortcuts → Screenshots). It never creates a file, so Screenshot Dock stays out of the way.
 
 ## Setup
 
