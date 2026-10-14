@@ -32,6 +32,7 @@ Save, Inspiration and Records go into a `screenshots` folder on your Desktop. Yo
 - **Recently removed** at the bottom brings back anything you took off by mistake.
 - Delete a file in Finder and it disappears from the shelf too.
 - Right-click the Dock icon for your latest screenshots.
+- Settings (gear) → **Screenshots per row**: 2, or 1 for larger previews.
 
 ## Copy-only screenshots
 

@@ -150,6 +150,14 @@ struct ShelfItem: Codable, Identifiable, Equatable {
 
     var url: URL { URL(fileURLWithPath: path) }
     var name: String { url.deletingPathExtension().lastPathComponent }
+
+    /// The name without the " – Oct 13, 8.41 PM" date the app adds (the file keeps it).
+    var displayName: String {
+        let n = name
+        guard let r = n.range(of: " – ", options: .backwards) else { return n }
+        let suffix = n[r.upperBound...]
+        return (suffix.contains("AM") || suffix.contains("PM")) ? String(n[..<r.lowerBound]) : n
+    }
 }
 
 final class Store: ObservableObject {
@@ -297,6 +305,8 @@ final class Prefs: ObservableObject {
 
     /// Shelf hotkey: plain ` instead of ⌥`. Plain ` means the backtick key can't be typed while the app runs.
     @Published var plainBacktick: Bool { didSet { d.set(plainBacktick, forKey: "plainBacktick"); applyHotkeys() } }
+    /// Screenshots per row on the shelf: 1 (large) or 2.
+    @Published var columns: Int { didSet { d.set(columns, forKey: "columns") } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled {
         didSet { try? atLogin ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
     }
@@ -310,7 +320,8 @@ final class Prefs: ObservableObject {
     @Published var basePath = Folders.base.path
 
     init() {
-        d.register(defaults: ["plainBacktick": false])
+        d.register(defaults: ["plainBacktick": false, "columns": 2])
+        columns = d.integer(forKey: "columns")
         plainBacktick = d.bool(forKey: "plainBacktick")
     }
 
@@ -573,7 +584,7 @@ final class Watcher {
 enum Thumbs {
     private static var cache: [String: NSImage] = [:]
 
-    static func image(_ path: String, max: Int = 400) -> NSImage? {
+    static func image(_ path: String, max: Int = 800) -> NSImage? {
         if let i = cache[path] { return i }
         let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                      kCGImageSourceThumbnailMaxPixelSize: max,
@@ -908,12 +919,13 @@ struct DragThumb: NSViewRepresentable {
 struct Tile: View {
     let item: ShelfItem
     @ObservedObject var ui: ShelfUI
+    var thumbHeight: CGFloat = 104
 
     var body: some View {
         let hovered = ui.hovered == item.id
         VStack(alignment: .leading, spacing: 5) {
             ZStack(alignment: .topTrailing) {
-                DragThumb(item: item).frame(height: 104)
+                DragThumb(item: item).frame(height: thumbHeight)
                 if hovered || item.pinned {
                     HStack(spacing: 4) {
                         circleButton(item.pinned ? "pin.fill" : "pin", tint: item.pinned ? .orange : .primary) {
@@ -930,7 +942,7 @@ struct Tile: View {
             }
             HStack(alignment: .top, spacing: 5) {
                 Circle().fill(item.category.color).frame(width: 6, height: 6).padding(.top, 4)
-                Text(item.name).font(.system(size: 11)).lineLimit(2).truncationMode(.middle)
+                Text(item.displayName).font(.system(size: 11)).lineLimit(2).truncationMode(.tail)
             }
         }
         .onHover { inside in
@@ -967,7 +979,7 @@ struct ShelfView: View {
     @ObservedObject var ui: ShelfUI
     @ObservedObject var prefs: Prefs
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    private var columns: [GridItem] { Array(repeating: GridItem(.flexible(), spacing: 12), count: prefs.columns) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1012,7 +1024,7 @@ struct ShelfView: View {
         if !list.isEmpty {
             Text(title.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
             LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                ForEach(list) { Tile(item: $0, ui: ui) }
+                ForEach(list) { Tile(item: $0, ui: ui, thumbHeight: prefs.columns == 1 ? 210 : 104) }
             }
         }
     }
@@ -1085,7 +1097,7 @@ struct ShelfView: View {
             if ui.showRemoved {
                 ForEach(store.removed.prefix(8)) { item in
                     HStack {
-                        Text(item.name).font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
+                        Text(item.displayName).font(.system(size: 11)).lineLimit(1).truncationMode(.tail)
                         Spacer()
                         Button("Restore") { store.restore(item) }.font(.system(size: 11))
                     }
@@ -1109,6 +1121,11 @@ struct ShelfView: View {
                     Text("Plain ` means you can't type a backtick while Screenshot Dock is running.")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
+                Picker("Screenshots per row", selection: $prefs.columns) {
+                    Text("1 (large)").tag(1)
+                    Text("2").tag(2)
+                }
+                .pickerStyle(.segmented)
                 Toggle("Open at login", isOn: $prefs.atLogin)
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
