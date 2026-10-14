@@ -57,12 +57,39 @@ enum Category: String, Codable, CaseIterable {
 enum Folders {
     static let home = FileManager.default.homeDirectoryForCurrentUser
     static let desktop = home.appendingPathComponent("Desktop")
-    /// Filed screenshots live in a "screenshots" folder on the Desktop.
-    static let base = desktop.appendingPathComponent("screenshots")
+    static let defaultBase = desktop.appendingPathComponent("screenshots")
+
+    /// The folder filed screenshots go into. It's remembered with a bookmark, so it can be
+    /// moved or renamed. Returns nil if it was deleted or moved to the Trash.
+    static func resolveBase() -> URL? {
+        let d = UserDefaults.standard
+        guard let data = d.data(forKey: "baseBookmark") else {
+            try? FileManager.default.createDirectory(at: defaultBase, withIntermediateDirectories: true)
+            setBase(defaultBase)
+            return defaultBase
+        }
+        var stale = false
+        guard let u = try? URL(resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale),
+              FileManager.default.fileExists(atPath: u.path), !u.path.contains("/.Trash/") else { return nil }
+        if stale { setBase(u) }
+        return u
+    }
+
+    static func setBase(_ u: URL) {
+        if let b = try? u.bookmarkData() { UserDefaults.standard.set(b, forKey: "baseBookmark") }
+    }
+
+    /// The screenshots folder, or the Desktop if it's missing.
+    static var base: URL { resolveBase() ?? desktop }
     /// Where macOS drops new screenshots before they're sorted (kept off the Desktop).
     static let inbox = home.appendingPathComponent("Screenshots/Inbox")
 
     static func destination(_ c: Category) -> URL {
+        if c == .remember { return desktop }
+        guard let base = resolveBase() else {
+            Prefs.shared.folderMissing = true
+            return desktop
+        }
         switch c {
         case .remember: return desktop
         case .inspiration: return base.appendingPathComponent("inspiration")
@@ -155,7 +182,7 @@ final class Store: ObservableObject {
 
     func add(_ url: URL, _ c: Category) {
         let item = ShelfItem(path: url.path, bookmark: try? url.bookmarkData(), category: c,
-                             pinned: c == .remember, added: Date())
+                             pinned: false, added: Date())
         items.insert(item, at: 0)
         if !Shelf.shared.isVisible { unseen += 1 }
         save()
@@ -277,6 +304,11 @@ final class Prefs: ObservableObject {
     @Published var setUp = Folders.isSetUp
     /// macOS saved a screenshot to the Desktop even though another folder is chosen.
     @Published var desktopFallback = false
+    /// The screenshots folder was deleted or trashed, so screenshots are going to the Desktop.
+    @Published var folderMissing = false {
+        didSet { if folderMissing { NSApp.dockTile.badgeLabel = "!" } else if Store.shared.unseen == 0 { NSApp.dockTile.badgeLabel = nil } }
+    }
+    @Published var basePath = Folders.base.path
 
     init() {
         d.register(defaults: ["copyHotkey": true, "plainBacktick": false])
@@ -304,7 +336,27 @@ final class Prefs: ObservableObject {
         try? p.run()
     }
 
-    func refreshSetup() { setUp = Folders.isSetUp }
+    func refreshSetup() {
+        setUp = Folders.isSetUp
+        let base = Folders.resolveBase()
+        if folderMissing != (base == nil) { folderMissing = base == nil }
+        basePath = (base ?? Folders.desktop).path
+    }
+
+    /// Pick (or re-pick) the folder filed screenshots go into.
+    func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose where Inspiration, Random and Records screenshots go."
+        panel.directoryURL = Folders.desktop
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Folders.setBase(url)
+        refreshSetup()
+    }
 }
 
 // MARK: - Naming screenshots from their contents
@@ -942,6 +994,7 @@ struct ShelfView: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
 
+            if prefs.folderMissing { missingBanner }
             if !prefs.setUp { setupBanner } else if prefs.desktopFallback { fallbackBanner }
 
             Divider()
@@ -986,6 +1039,25 @@ struct ShelfView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.accentColor.opacity(0.12))
+    }
+
+    var missingBanner: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Your screenshots folder is missing").font(.system(size: 12, weight: .semibold))
+            Text("It was deleted or moved to the Trash, so new screenshots are going straight to your Desktop. Choose a folder to use from now on.")
+                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Choose folder…") { prefs.chooseFolder() }
+                Button("Make a new one on the Desktop") {
+                    try? FileManager.default.createDirectory(at: Folders.defaultBase, withIntermediateDirectories: true)
+                    Folders.setBase(Folders.defaultBase); prefs.refreshSetup()
+                }
+            }
+            .font(.system(size: 11))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.red.opacity(0.14))
     }
 
     var fallbackBanner: some View {
@@ -1062,8 +1134,16 @@ struct ShelfView: View {
                         .font(.system(size: 11))
                     }
                 }
-                Text("Folders: Remember → Desktop · Inspiration, Random, Records → Desktop/screenshots")
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Screenshots folder: \(prefs.basePath.replacingOccurrences(of: Folders.home.path, with: "~"))")
+                            .font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button("Change…") { prefs.chooseFolder() }.font(.system(size: 11))
+                    }
+                    Text("Remember goes to the Desktop. Inspiration, Random and Records go into this folder.")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                }
                 Divider()
                 Button("Quit Screenshot Dock") { NSApp.terminate(nil) }
             }
@@ -1087,8 +1167,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        for c in [Category.inspiration, .random, .records] {
-            try? FileManager.default.createDirectory(at: Folders.destination(c), withIntermediateDirectories: true)
+        if Folders.resolveBase() != nil {
+            for c in [Category.inspiration, .random, .records] {
+                try? FileManager.default.createDirectory(at: Folders.destination(c), withIntermediateDirectories: true)
+            }
         }
         buildMenu()
         Store.shared.refresh()

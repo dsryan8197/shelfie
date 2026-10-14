@@ -14,11 +14,15 @@ Taking several screenshots in a row? While the bar is showing, each new one join
 
 | Key | Category | Where it goes |
 |---|---|---|
-| **1** | Remember | Your Desktop, and pinned on the shelf |
+| **1** | Remember | Your Desktop |
 | **2** | Inspiration | `Desktop/screenshots/inspiration` |
 | **3** | Random (default) | `Desktop/screenshots/random` |
 | **4** | Records | `Desktop/screenshots/records/<year>` |
 | **5** | Photos | Saved to Photos (syncs to your iPhone) and `Desktop/screenshots/random` |
+
+## Your screenshots folder
+
+Inspiration, Random and Records go into a `screenshots` folder on your Desktop. You can move or rename that folder and Screenshot Dock follows it. If it's deleted, new screenshots go to your Desktop and the shelf shows an alert (with a **!** on the Dock icon) so you can choose a new folder. To use a different folder, open the shelf → gear → **Change…**
 
 ## The shelf
 
