@@ -873,8 +873,10 @@ final class DragImageView: NSView, NSDraggingSource {
         wantsLayer = true
         layer?.contentsGravity = .resizeAspectFill
         layer?.masksToBounds = true
-        layer?.cornerRadius = 8
+        layer?.cornerRadius = 7
         layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+        layer?.borderWidth = 0.5
+        layer?.borderColor = NSColor.separatorColor.cgColor
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -923,7 +925,7 @@ struct Tile: View {
 
     var body: some View {
         let hovered = ui.hovered == item.id
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 DragThumb(item: item).frame(height: thumbHeight)
                 if hovered || item.pinned {
@@ -944,7 +946,12 @@ struct Tile: View {
                 Circle().fill(item.category.color).frame(width: 6, height: 6).padding(.top, 4)
                 Text(item.displayName).font(.system(size: 11)).lineLimit(2).truncationMode(.tail)
             }
+            .padding(.horizontal, 2)
         }
+        // Each screenshot sits on its own card so similar images don't blur together.
+        .padding(6)
+        .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(hovered ? 0.09 : 0.05)))
+        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color.primary.opacity(hovered ? 0.22 : 0.12), lineWidth: 1))
         .onHover { inside in
             if inside { ui.hovered = item.id } else if ui.hovered == item.id { ui.hovered = nil }
         }
