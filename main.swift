@@ -298,6 +298,19 @@ final class HotKeys {
 
 // MARK: - Preferences
 
+/// How screenshots are told apart when the shelf shows one per row.
+enum RowStyle: String, CaseIterable {
+    case divider, titleAbove, caption, colorEdge
+    var title: String {
+        switch self {
+        case .divider: return "Divider line"
+        case .titleAbove: return "Title above"
+        case .caption: return "Caption bar"
+        case .colorEdge: return "Color edge"
+        }
+    }
+}
+
 final class Prefs: ObservableObject {
     static let shared = Prefs()
     private let d = UserDefaults.standard
@@ -307,6 +320,7 @@ final class Prefs: ObservableObject {
     @Published var plainBacktick: Bool { didSet { d.set(plainBacktick, forKey: "plainBacktick"); applyHotkeys() } }
     /// Screenshots per row on the shelf: 1 (large) or 2.
     @Published var columns: Int { didSet { d.set(columns, forKey: "columns") } }
+    @Published var rowStyle: RowStyle { didSet { d.set(rowStyle.rawValue, forKey: "rowStyle") } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled {
         didSet { try? atLogin ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
     }
@@ -322,6 +336,7 @@ final class Prefs: ObservableObject {
     init() {
         d.register(defaults: ["plainBacktick": false, "columns": 2])
         columns = d.integer(forKey: "columns")
+        rowStyle = RowStyle(rawValue: d.string(forKey: "rowStyle") ?? "") ?? .divider
         plainBacktick = d.bool(forKey: "plainBacktick")
     }
 
@@ -873,10 +888,8 @@ final class DragImageView: NSView, NSDraggingSource {
         wantsLayer = true
         layer?.contentsGravity = .resizeAspectFill
         layer?.masksToBounds = true
-        layer?.cornerRadius = 7
+        layer?.cornerRadius = 8
         layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
-        layer?.borderWidth = 0.5
-        layer?.borderColor = NSColor.separatorColor.cgColor
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -923,35 +936,12 @@ struct Tile: View {
     @ObservedObject var ui: ShelfUI
     var thumbHeight: CGFloat = 104
 
+    /// Only set for the one-per-row layout.
+    var style: RowStyle? = nil
+
     var body: some View {
-        let hovered = ui.hovered == item.id
-        VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topTrailing) {
-                DragThumb(item: item).frame(height: thumbHeight)
-                if hovered || item.pinned {
-                    HStack(spacing: 4) {
-                        circleButton(item.pinned ? "pin.fill" : "pin", tint: item.pinned ? .orange : .primary) {
-                            Store.shared.togglePin(item)
-                        }
-                        .help(item.pinned ? "Unpin" : "Pin to keep it on the shelf")
-                        if hovered {
-                            circleButton("xmark", tint: .primary) { Store.shared.remove(item) }
-                                .help("Remove from the shelf (the file stays)")
-                        }
-                    }
-                    .padding(6)
-                }
-            }
-            HStack(alignment: .top, spacing: 5) {
-                Circle().fill(item.category.color).frame(width: 6, height: 6).padding(.top, 4)
-                Text(item.displayName).font(.system(size: 11)).lineLimit(2).truncationMode(.tail)
-            }
-            .padding(.horizontal, 2)
-        }
-        // Each screenshot sits on its own card so similar images don't blur together.
-        .padding(6)
-        .background(RoundedRectangle(cornerRadius: 11).fill(Color.primary.opacity(hovered ? 0.09 : 0.05)))
-        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color.primary.opacity(hovered ? 0.22 : 0.12), lineWidth: 1))
+        content
+            .contentShape(Rectangle())
         .onHover { inside in
             if inside { ui.hovered = item.id } else if ui.hovered == item.id { ui.hovered = nil }
         }
@@ -968,6 +958,67 @@ struct Tile: View {
             Button("Remove from Shelf") { Store.shared.remove(item) }
             Divider()
             Button("Move File to Trash") { Store.shared.trash(item) }
+        }
+    }
+
+    @ViewBuilder
+    var content: some View {
+        switch style {
+        case .titleAbove?:
+            VStack(alignment: .leading, spacing: 6) {
+                title(weight: .semibold, size: 12)
+                thumb
+            }
+        case .caption?:
+            thumb.overlay(alignment: .bottom) {
+                title(weight: .medium, size: 12)
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.black.opacity(0.72))
+                    .foregroundStyle(.white)
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8))
+                    .allowsHitTesting(false)
+            }
+        case .colorEdge?:
+            HStack(alignment: .top, spacing: 8) {
+                RoundedRectangle(cornerRadius: 2).fill(item.category.color).frame(width: 3)
+                VStack(alignment: .leading, spacing: 6) {
+                    thumb
+                    title(dot: false)
+                }
+            }
+        default:
+            VStack(alignment: .leading, spacing: 5) {
+                thumb
+                title()
+            }
+        }
+    }
+
+    var thumb: some View {
+        let hovered = ui.hovered == item.id
+        return ZStack(alignment: .topTrailing) {
+            DragThumb(item: item).frame(height: thumbHeight)
+            if hovered || item.pinned {
+                HStack(spacing: 4) {
+                    circleButton(item.pinned ? "pin.fill" : "pin", tint: item.pinned ? .orange : .primary) {
+                        Store.shared.togglePin(item)
+                    }
+                    .help(item.pinned ? "Unpin" : "Pin to keep it on the shelf")
+                    if hovered {
+                        circleButton("xmark", tint: .primary) { Store.shared.remove(item) }
+                            .help("Remove from the shelf (the file stays)")
+                    }
+                }
+                .padding(6)
+            }
+        }
+    }
+
+    func title(dot: Bool = true, weight: Font.Weight = .regular, size: CGFloat = 11) -> some View {
+        HStack(alignment: .top, spacing: 5) {
+            if dot { Circle().fill(item.category.color).frame(width: 6, height: 6).padding(.top, size == 11 ? 4 : 5) }
+            Text(item.displayName).font(.system(size: size, weight: weight)).lineLimit(2).truncationMode(.tail)
         }
     }
 
@@ -1030,8 +1081,20 @@ struct ShelfView: View {
     func section(_ title: String, _ list: [ShelfItem]) -> some View {
         if !list.isEmpty {
             Text(title.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                ForEach(list) { Tile(item: $0, ui: ui, thumbHeight: prefs.columns == 1 ? 210 : 104) }
+            if prefs.columns == 1 {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
+                        Tile(item: item, ui: ui, thumbHeight: 210, style: prefs.rowStyle)
+                            .padding(.vertical, 7)
+                        if prefs.rowStyle == .divider && i < list.count - 1 {
+                            Rectangle().fill(Color.primary.opacity(0.18)).frame(height: 1).padding(.horizontal, -14)
+                        }
+                    }
+                }
+            } else {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                    ForEach(list) { Tile(item: $0, ui: ui, thumbHeight: 104) }
+                }
             }
         }
     }
@@ -1133,6 +1196,11 @@ struct ShelfView: View {
                     Text("2").tag(2)
                 }
                 .pickerStyle(.segmented)
+                if prefs.columns == 1 {
+                    Picker("Separate screenshots with", selection: $prefs.rowStyle) {
+                        ForEach(RowStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                }
                 Toggle("Open at login", isOn: $prefs.atLogin)
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
