@@ -300,13 +300,11 @@ final class HotKeys {
 
 /// How screenshots are told apart when the shelf shows one per row.
 enum RowStyle: String, CaseIterable {
-    case divider, titleAbove, caption, colorEdge
+    case divider, caption
     var title: String {
         switch self {
-        case .divider: return "Divider line"
-        case .titleAbove: return "Title above"
+        case .divider: return "Divider line (image only)"
         case .caption: return "Caption bar"
-        case .colorEdge: return "Color edge"
         }
     }
 }
@@ -964,11 +962,6 @@ struct Tile: View {
     @ViewBuilder
     var content: some View {
         switch style {
-        case .titleAbove?:
-            VStack(alignment: .leading, spacing: 6) {
-                title(weight: .semibold, size: 12)
-                thumb
-            }
         case .caption?:
             thumb.overlay(alignment: .bottom) {
                 title(weight: .medium, size: 12)
@@ -979,14 +972,8 @@ struct Tile: View {
                     .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8))
                     .allowsHitTesting(false)
             }
-        case .colorEdge?:
-            HStack(alignment: .top, spacing: 8) {
-                RoundedRectangle(cornerRadius: 2).fill(item.category.color).frame(width: 3)
-                VStack(alignment: .leading, spacing: 6) {
-                    thumb
-                    title(dot: false)
-                }
-            }
+        case .divider?:
+            thumb
         default:
             VStack(alignment: .leading, spacing: 5) {
                 thumb
