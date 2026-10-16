@@ -170,7 +170,7 @@ final class Store: ObservableObject {
     private struct Saved: Codable { var items: [ShelfItem]; var removed: [ShelfItem] }
     private let file: URL = {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ScreenshotDock")
+            .appendingPathComponent("Shelfie")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("shelf.json")
     }()
