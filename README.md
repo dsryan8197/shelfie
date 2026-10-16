@@ -1,4 +1,6 @@
-# Screenshot Dock
+# Shelfie
+
+*Formerly Screenshot Dock.*
 
 A Mac app that keeps screenshots off your Desktop and one click away in the Dock.
 
@@ -22,7 +24,7 @@ Taking several screenshots in a row? While the bar is showing, each new one join
 
 ## Your screenshots folder
 
-Save, Inspiration and Records go into a `screenshots` folder on your Desktop. You can move or rename that folder and Screenshot Dock follows it. If it's deleted, new screenshots go to your Desktop and the shelf shows an alert (with a **!** on the Dock icon) so you can choose a new folder. To use a different folder, open the shelf → gear → **Change…**
+Save, Inspiration and Records go into a `screenshots` folder on your Desktop. You can move or rename that folder and Shelfie follows it. If it's deleted, new screenshots go to your Desktop and the shelf shows an alert (with a **!** on the Dock icon) so you can choose a new folder. To use a different folder, open the shelf → gear → **Change…**
 
 ## The shelf
 
@@ -36,7 +38,7 @@ Save, Inspiration and Records go into a `screenshots` folder on your Desktop. Yo
 
 ## Copy-only screenshots
 
-For screenshots you're about to paste, use macOS's own "Copy picture of selected area to the clipboard" shortcut (System Settings → Keyboard → Keyboard Shortcuts → Screenshots). It never creates a file, so Screenshot Dock stays out of the way.
+For screenshots you're about to paste, use macOS's own "Copy picture of selected area to the clipboard" shortcut (System Settings → Keyboard → Keyboard Shortcuts → Screenshots). It never creates a file, so Shelfie stays out of the way.
 
 ## Setup
 
@@ -48,7 +50,7 @@ Requires macOS 26 or newer. Names use Apple Intelligence when it's on, and fall 
 
 ```bash
 ./build.sh        # builds and installs to /Applications
-./build.sh dist   # also makes dist/ScreenshotDock.dmg
+./build.sh dist   # also makes dist/Shelfie.dmg
 ```
 
 The whole app is one file: [`main.swift`](main.swift).

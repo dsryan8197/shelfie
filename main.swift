@@ -1,4 +1,4 @@
-// Screenshot Dock — a Dock-icon shelf for screenshots, with a quick-choice bar after each capture.
+// Shelfie — a Dock-icon shelf for screenshots, with a quick-choice bar after each capture.
 // Single file, built with plain swiftc (see build.sh). Avoid SwiftUI macros (@State, @Observable):
 // command-line swiftc has no macro plugins, so state lives in ObservableObjects.
 
@@ -496,7 +496,7 @@ final class Router {
             n += 1
         }
         written.insert(dest.path)
-        do { try fm.moveItem(at: url, to: dest) } catch { NSLog("Screenshot Dock: move failed \(error)"); return }
+        do { try fm.moveItem(at: url, to: dest) } catch { NSLog("Shelfie: move failed \(error)"); return }
         if c == .photos { saveToPhotos(dest) }
         Store.shared.add(dest, c)
     }
@@ -1120,7 +1120,7 @@ struct ShelfView: View {
     var fallbackBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("macOS is still saving screenshots to your Desktop").font(.system(size: 12, weight: .semibold))
-            Text("Screenshot Dock still catches them, but to keep your Desktop clear, choose the folder once in Apple's screenshot menu: press ⌘⇧5 → Options → Other Location… → open your home folder → Screenshots → Inbox → Choose.")
+            Text("Shelfie still catches them, but to keep your Desktop clear, choose the folder once in Apple's screenshot menu: press ⌘⇧5 → Options → Other Location… → open your home folder → Screenshots → Inbox → Choose.")
                 .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button("Open the Inbox folder in Finder") { NSWorkspace.shared.open(Folders.inbox) }.font(.system(size: 11))
         }
@@ -1175,7 +1175,7 @@ struct ShelfView: View {
                         Text("⌥` (Option + backtick)").tag(false)
                         Text("` (backtick)").tag(true)
                     }
-                    Text("Plain ` means you can't type a backtick while Screenshot Dock is running.")
+                    Text("Plain ` means you can't type a backtick while Shelfie is running.")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
                 Picker("Screenshots per row", selection: $prefs.columns) {
@@ -1211,7 +1211,7 @@ struct ShelfView: View {
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                 }
                 Divider()
-                Button("Quit Screenshot Dock") { NSApp.terminate(nil) }
+                Button("Quit Shelfie") { NSApp.terminate(nil) }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1282,7 +1282,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Quit Screenshot Dock", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit Shelfie", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         NSApp.mainMenu = main
     }
