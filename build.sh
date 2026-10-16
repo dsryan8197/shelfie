@@ -29,7 +29,13 @@ cat > $APP/Contents/Info.plist <<PLIST
   <key>NSDesktopFolderUsageDescription</key><string>Shelfie watches for new screenshots and puts "Remember" screenshots on your Desktop.</string>
 </dict></plist>
 PLIST
-codesign --force --sign - $APP
+# Sign with the same local certificate every time so macOS keeps Shelfie's permissions across rebuilds.
+# (Falls back to ad-hoc signing on a Mac without it; then permissions must be re-granted after each build.)
+if security find-certificate -c "Daniel Ryan Local Signing" >/dev/null 2>&1; then
+  codesign --force --sign "Daniel Ryan Local Signing" $APP
+else
+  codesign --force --sign - $APP
+fi
 echo "Built $APP"
 
 if [[ "$1" == "dist" ]]; then
