@@ -12,26 +12,56 @@ import FoundationModels
 
 // MARK: - Categories and folders
 
+/// One of the choices people set up themselves (keys 2–4): name, icon and folder.
+struct Slot: Codable, Equatable {
+    var name: String
+    var icon: String
+    /// Bookmark to the folder. nil until they choose one (they're asked the first time they use it).
+    var folder: Data?
+    /// File into a sub-folder per year, like records/2026.
+    var perYear = false
+    var on = true
+
+    static let icons = ["tray.and.arrow.down.fill", "sparkles", "doc.text.fill", "folder.fill", "star.fill",
+                        "bookmark.fill", "briefcase.fill", "heart.fill", "lightbulb.fill", "cart.fill",
+                        "house.fill", "graduationcap.fill"]
+
+    /// The starter choices. Folders start blank.
+    static func starter(_ c: Category) -> Slot {
+        switch c {
+        case .inspiration: return Slot(name: "Inspiration", icon: "sparkles")
+        case .records: return Slot(name: "Records", icon: "doc.text.fill", perYear: true)
+        default: return Slot(name: "Save", icon: "tray.and.arrow.down.fill")
+        }
+    }
+}
+
 enum Category: String, Codable, CaseIterable {
     // Raw values are stored in shelf.json, so they keep their original names.
+    // Desktop (1) and Photos (5) are fixed; 2–4 are set up in Settings.
     case remember, random, inspiration, records, photos
+
+    static let custom: [Category] = [.random, .inspiration, .records]
+    var isCustom: Bool { Category.custom.contains(self) }
+    var slot: Slot? { isCustom ? Prefs.shared.slot(self) : nil }
+
+    /// The choices shown in the quick-choice bar.
+    static var visible: [Category] { allCases.filter { $0.slot?.on ?? true } }
 
     var title: String {
         switch self {
         case .remember: return "Desktop"
-        case .random: return "Save"
-        case .inspiration: return "Inspiration"
-        case .records: return "Records"
         case .photos: return "Photos"
+        default:
+            let n = slot?.name.trimmingCharacters(in: .whitespaces) ?? ""
+            return n.isEmpty ? "Option \(key)" : n
         }
     }
     var icon: String {
         switch self {
         case .remember: return "desktopcomputer"
-        case .random: return "tray.and.arrow.down.fill"
-        case .inspiration: return "sparkles"
-        case .records: return "doc.text.fill"
         case .photos: return "photo.on.rectangle"
+        default: return slot?.icon ?? "folder.fill"
         }
     }
     var color: Color {
@@ -58,48 +88,49 @@ enum Category: String, Codable, CaseIterable {
 enum Folders {
     static let home = FileManager.default.homeDirectoryForCurrentUser
     static let desktop = home.appendingPathComponent("Desktop")
-    static let defaultBase = desktop.appendingPathComponent("screenshots")
+    /// The holding folder: macOS saves new screenshots here, and Shelfie moves each one to its
+    /// final home. Each person picks or creates it during setup; nil until then.
+    static var holding: URL? { resolve(UserDefaults.standard.data(forKey: "holding")) }
+    /// Photos-only screenshots wait here until they're in Photos (made only when needed).
+    static let sending = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Shelfie/Sending to Photos")
 
-    /// The folder filed screenshots go into. It's remembered with a bookmark, so it can be
-    /// moved or renamed. Returns nil if it was deleted or moved to the Trash.
-    static func resolveBase() -> URL? {
-        let d = UserDefaults.standard
-        guard let data = d.data(forKey: "baseBookmark") else {
-            try? FileManager.default.createDirectory(at: defaultBase, withIntermediateDirectories: true)
-            setBase(defaultBase)
-            return defaultBase
-        }
+    /// Folders are remembered with bookmarks, so they can be moved or renamed.
+    /// Returns nil if the folder was deleted or moved to the Trash.
+    static func resolve(_ bookmark: Data?) -> URL? {
+        guard let bookmark else { return nil }
         var stale = false
-        guard let u = try? URL(resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale),
+        guard let u = try? URL(resolvingBookmarkData: bookmark, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale),
               FileManager.default.fileExists(atPath: u.path), !u.path.contains("/.Trash/") else { return nil }
-        if stale { setBase(u) }
         return u
     }
 
-    static func setBase(_ u: URL) {
-        if let b = try? u.bookmarkData() { UserDefaults.standard.set(b, forKey: "baseBookmark") }
-    }
+    static func bookmark(_ u: URL) -> Data? { try? u.bookmarkData() }
 
-    /// The screenshots folder, or the Desktop if it's missing.
-    static var base: URL { resolveBase() ?? desktop }
-    /// Where macOS drops new screenshots before they're sorted (kept off the Desktop).
-    static let inbox = home.appendingPathComponent("Screenshots/Inbox")
-
-    static func destination(_ c: Category) -> URL {
-        if c == .remember { return desktop }
-        guard let base = resolveBase() else {
-            Prefs.shared.folderMissing = true
-            return desktop
-        }
+    /// The folder a choice files into, or nil when it hasn't been chosen or is missing.
+    static func folder(_ c: Category) -> URL? {
         switch c {
         case .remember: return desktop
-        case .inspiration: return base.appendingPathComponent("inspiration")
-        case .random, .photos: return base.appendingPathComponent("save")
-        case .records:
-            let year = Calendar.current.component(.year, from: Date())
-            return base.appendingPathComponent("records/\(year)")
+        case .photos: return resolve(Prefs.shared.photosKeep)
+        default: return resolve(c.slot?.folder)
         }
     }
+
+    /// Where a screenshot goes. nil means Photos only (no copy kept). A missing folder falls back
+    /// to the Desktop, and the shelf shows an alert.
+    static func destination(_ c: Category) -> URL? {
+        if c == .photos && Prefs.shared.photosKeep == nil { return nil }
+        guard let dir = folder(c) else {
+            Prefs.shared.refreshSetup()
+            return desktop
+        }
+        if c.slot?.perYear == true {
+            return dir.appendingPathComponent("\(Calendar.current.component(.year, from: Date()))")
+        }
+        return dir
+    }
+
+    static func short(_ u: URL) -> String { u.path.replacingOccurrences(of: home.path, with: "~") }
 
     private static let domain = "com.apple.screencapture" as CFString
 
@@ -117,18 +148,26 @@ enum Folders {
         return (CFPreferencesCopyAppValue("show-thumbnail" as CFString, domain) as? Bool) ?? true
     }
 
-    static var isSetUp: Bool { screenshotLocation.standardizedFileURL.path == inbox.standardizedFileURL.path && !thumbnailOn }
+    static var isSetUp: Bool {
+        guard let h = holding else { return false }
+        return same(screenshotLocation, h) && !thumbnailOn
+    }
 
-    /// Point macOS screenshots at the Inbox and turn off the floating thumbnail, so the
-    /// quick-choice bar appears instantly. `restore` puts Apple's defaults back.
-    static func configureScreenshots(restore: Bool = false) {
-        try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
-        if restore {
+    static func same(_ a: URL, _ b: URL) -> Bool { a.standardizedFileURL.path == b.standardizedFileURL.path }
+    static func inside(_ a: URL, _ b: URL) -> Bool {
+        let pa = a.standardizedFileURL.path, pb = b.standardizedFileURL.path
+        return pa == pb || pa.hasPrefix(pb + "/")
+    }
+
+    /// Point macOS screenshots at the holding folder and turn off the floating thumbnail, so the
+    /// quick-choice bar appears instantly. nil puts Apple's defaults back.
+    static func configureScreenshots(to folder: URL?) {
+        if let folder {
+            CFPreferencesSetAppValue("location" as CFString, folder.path as CFString, domain)
+            CFPreferencesSetAppValue("show-thumbnail" as CFString, kCFBooleanFalse, domain)
+        } else {
             CFPreferencesSetAppValue("location" as CFString, nil, domain)
             CFPreferencesSetAppValue("show-thumbnail" as CFString, nil, domain)
-        } else {
-            CFPreferencesSetAppValue("location" as CFString, inbox.path as CFString, domain)
-            CFPreferencesSetAppValue("show-thumbnail" as CFString, kCFBooleanFalse, domain)
         }
         CFPreferencesAppSynchronize(domain)
         let p = Process()
@@ -325,18 +364,88 @@ final class Prefs: ObservableObject {
     @Published var setUp = Folders.isSetUp
     /// macOS saved a screenshot to the Desktop even though another folder is chosen.
     @Published var desktopFallback = false
-    /// The screenshots folder was deleted or trashed, so screenshots are going to the Desktop.
-    @Published var folderMissing = false {
-        didSet { if folderMissing { NSApp.dockTile.badgeLabel = "!" } else if Store.shared.unseen == 0 { NSApp.dockTile.badgeLabel = nil } }
+    /// Choices whose folder was deleted or trashed, so their screenshots are going to the Desktop.
+    @Published var missing: [Category] = [] {
+        didSet { if !missing.isEmpty { NSApp.dockTile.badgeLabel = "!" } else if Store.shared.unseen == 0 { NSApp.dockTile.badgeLabel = nil } }
     }
-    @Published var basePath = Folders.base.path
+
+    /// Shelf text size: 0 small, 1 medium, 2 large, 3 extra large.
+    @Published var textSize: Int { didSet { d.set(textSize, forKey: "textSize") } }
+    /// Shelf window size: 0 small, 1 medium, 2 large, 3 extra large.
+    @Published var shelfSize: Int { didSet { d.set(shelfSize, forKey: "shelfSize"); Shelf.shared.applySize() } }
+    static let sizeNames = ["Small", "Medium", "Large", "Extra large"]
+    var textScale: CGFloat { [0.9, 1, 1.15, 1.3][min(max(textSize, 0), 3)] }
+    var shelfDims: NSSize {
+        let d = [NSSize(width: 340, height: 480), NSSize(width: 380, height: 560),
+                 NSSize(width: 460, height: 680), NSSize(width: 560, height: 820)][min(max(shelfSize, 0), 3)]
+        return NSSize(width: d.width, height: min(d.height, screenUnderMouse().visibleFrame.height - 16))
+    }
+
+    /// Keys 2–4, by Category raw value.
+    @Published var slots: [String: Slot] { didSet { if let data = try? JSONEncoder().encode(slots) { d.set(data, forKey: "slots") } } }
+    /// Photos (5) can also keep the file in a folder. nil = Photos only.
+    @Published var photosKeep: Data? { didSet { d.set(photosKeep, forKey: "photosKeep") } }
+    /// Where screenshots go if you don't choose within 6 seconds (or press Esc).
+    @Published var defaultChoice: Category { didSet { d.set(defaultChoice.rawValue, forKey: "defaultChoice") } }
 
     init() {
         d.register(defaults: ["plainBacktick": false, "columns": 2])
         columns = d.integer(forKey: "columns")
         rowStyle = RowStyle(rawValue: d.string(forKey: "rowStyle") ?? "") ?? .divider
         plainBacktick = d.bool(forKey: "plainBacktick")
+        textSize = d.object(forKey: "textSize") as? Int ?? 1
+        shelfSize = d.object(forKey: "shelfSize") as? Int ?? 1
+
+        // Older versions always used ~/Screenshots/Inbox as the holding folder.
+        if d.data(forKey: "holding") == nil {
+            let old = Folders.home.appendingPathComponent("Screenshots/Inbox")
+            if Folders.same(Folders.screenshotLocation, old), let b = Folders.resolve(Folders.bookmark(old)).flatMap(Folders.bookmark) {
+                d.set(b, forKey: "holding")
+            }
+        }
+
+        if let data = d.data(forKey: "slots"), let s = try? JSONDecoder().decode([String: Slot].self, from: data) {
+            slots = s
+            photosKeep = d.data(forKey: "photosKeep")
+            defaultChoice = Category(rawValue: d.string(forKey: "defaultChoice") ?? "") ?? .remember
+        } else {
+            // First launch of this version. Starter choices with blank folders and Desktop as the default,
+            // unless an older version already used a screenshots folder: then keep using its sub-folders.
+            var s: [String: Slot] = [:]
+            for c in Category.custom { s[c.rawValue] = Slot.starter(c) }
+            photosKeep = nil
+            defaultChoice = .remember
+            if let base = Folders.resolve(d.data(forKey: "baseBookmark")) {
+                func sub(_ name: String) -> Data? {
+                    let u = base.appendingPathComponent(name)
+                    try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+                    return Folders.bookmark(u)
+                }
+                s["random"]?.folder = sub("save")
+                s["inspiration"]?.folder = sub("inspiration")
+                s["records"]?.folder = sub("records")
+                photosKeep = sub("save")
+                defaultChoice = .random
+            }
+            slots = s
+            if let data = try? JSONEncoder().encode(s) { d.set(data, forKey: "slots") }
+            d.set(photosKeep, forKey: "photosKeep")
+            d.set(defaultChoice.rawValue, forKey: "defaultChoice")
+        }
     }
+
+    func slot(_ c: Category) -> Slot { slots[c.rawValue] ?? Slot.starter(c) }
+
+    /// The choice used when you don't pick one. Falls back to the Desktop if the default
+    /// is switched off or has no folder yet (there's no one to ask).
+    var fallbackChoice: Category {
+        let c = defaultChoice
+        if c.isCustom && (!slot(c).on || slot(c).folder == nil) { return .remember }
+        return c
+    }
+
+    /// True when pressing this choice should first ask for a folder.
+    func needsFolder(_ c: Category) -> Bool { c.isCustom && slot(c).folder == nil }
 
     var shelfKeyLabel: String { plainBacktick ? "`" : "⌥`" }
 
@@ -349,25 +458,85 @@ final class Prefs: ObservableObject {
     }
 
     func refreshSetup() {
-        setUp = Folders.isSetUp
-        let base = Folders.resolveBase()
-        if folderMissing != (base == nil) { folderMissing = base == nil }
-        basePath = (base ?? Folders.desktop).path
+        if setUp != Folders.isSetUp { setUp = Folders.isSetUp }
+        var m = Category.custom.filter { slot($0).on && slot($0).folder != nil && Folders.folder($0) == nil }
+        if photosKeep != nil && Folders.folder(.photos) == nil { m.append(.photos) }
+        if missing != m { missing = m }
     }
 
-    /// Pick (or re-pick) the folder filed screenshots go into.
-    func chooseFolder() {
+    /// Pick (or re-pick) the folder a choice files into. Returns false if cancelled.
+    @discardableResult
+    func chooseFolder(for c: Category) -> Bool {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = "Use This Folder"
-        panel.message = "Choose where Inspiration, Random and Records screenshots go."
-        panel.directoryURL = Folders.desktop
+        panel.message = c == .photos
+            ? "Choose a folder to also keep a copy of Photos screenshots in."
+            : "Choose where \"\(c.title)\" screenshots go (key \(c.key)). Shelfie will remember it."
+        panel.directoryURL = Folders.folder(c) ?? Folders.home
         NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        Folders.setBase(url)
+        Shelf.shared.holdOpen = true
+        defer { Shelf.shared.holdOpen = false; Shelf.shared.rekey() }
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        // The holding folder is emptied as screenshots arrive, so it can't also be a destination.
+        if let h = Folders.holding, Folders.inside(url, h) || Folders.inside(h, url) {
+            alert("Please choose a different folder",
+                  "\(Folders.short(h)) is your holding folder, where new screenshots wait to be filed, so it can't also hold filed ones.")
+            return false
+        }
+        if c == .photos {
+            photosKeep = Folders.bookmark(url)
+        } else {
+            slots[c.rawValue, default: Slot.starter(c)].folder = Folders.bookmark(url)
+        }
         refreshSetup()
+        return true
+    }
+
+    /// Setup: pick or create the holding folder, then point macOS screenshots at it.
+    @discardableResult
+    func chooseHolding() -> Bool {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Use as Holding Folder"
+        panel.message = "Choose or create an empty folder (use New Folder). New screenshots wait here for a moment while Shelfie files them, so it stays empty."
+        panel.directoryURL = Folders.holding ?? Folders.home
+        NSApp.activate(ignoringOtherApps: true)
+        Shelf.shared.holdOpen = true
+        defer { Shelf.shared.holdOpen = false; Shelf.shared.rekey() }
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+
+        let destinations = Category.allCases.filter { $0 != .remember }.compactMap { Folders.folder($0) }
+        if Folders.same(url, Folders.desktop) || Folders.same(url, Folders.home) {
+            alert("Please choose a different folder", "Pick or create a folder just for this, so Shelfie can tell new screenshots apart.")
+            return false
+        }
+        if destinations.contains(where: { Folders.inside(url, $0) || Folders.inside($0, url) }) {
+            alert("Please choose a different folder", "That's where filed screenshots go. The holding folder needs to be separate.")
+            return false
+        }
+        let isCurrent = Folders.holding.map { Folders.same($0, url) } ?? false
+        let existing = ((try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []).filter(Watcher.isScreenshot)
+        if !isCurrent && !existing.isEmpty {
+            alert("This folder already has screenshots in it",
+                  "Shelfie files everything that lands in the holding folder, so it would move those too. Use New Folder to make an empty one.")
+            return false
+        }
+        UserDefaults.standard.set(Folders.bookmark(url), forKey: "holding")
+        Folders.configureScreenshots(to: url)
+        refreshSetup()
+        return true
+    }
+
+    func alert(_ title: String, _ text: String) {
+        let a = NSAlert()
+        a.messageText = title
+        a.informativeText = text
+        a.runModal()
     }
 }
 
@@ -484,36 +653,66 @@ final class Router {
     }
 
     private func finish(_ url: URL, _ c: Category, title: String, stamp: String) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let keep = Folders.destination(c)
+        guard let dest = move(url, into: keep ?? Folders.sending, name: "\(title) – \(stamp)") else { return }
+        if c == .photos {
+            saveToPhotos(dest) { ok in
+                guard keep == nil else { return }
+                // Photos only: once it's safely in Photos, the file goes to the Trash.
+                // If Photos refused it, keep the screenshot on the Desktop instead of losing it.
+                if ok {
+                    NSWorkspace.shared.recycle([dest]) { _, _ in }
+                } else if let back = self.move(dest, into: Folders.desktop, name: dest.deletingPathExtension().lastPathComponent) {
+                    Store.shared.add(back, .remember)
+                }
+            }
+        }
+        if keep != nil { Store.shared.add(dest, c) }
+    }
+
+    /// Moves a file into a folder under a new name (adding " 2", " 3"… if taken).
+    private func move(_ url: URL, into dir: URL, name: String) -> URL? {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: url.path) else { return }
-        let dir = Folders.destination(c)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let ext = url.pathExtension.isEmpty ? "png" : url.pathExtension
-        var dest = dir.appendingPathComponent("\(title) – \(stamp).\(ext)")
+        var dest = dir.appendingPathComponent("\(name).\(ext)")
         var n = 2
         while fm.fileExists(atPath: dest.path) {
-            dest = dir.appendingPathComponent("\(title) – \(stamp) \(n).\(ext)")
+            dest = dir.appendingPathComponent("\(name) \(n).\(ext)")
             n += 1
         }
         written.insert(dest.path)
-        do { try fm.moveItem(at: url, to: dest) } catch { NSLog("Shelfie: move failed \(error)"); return }
-        if c == .photos { saveToPhotos(dest) }
-        Store.shared.add(dest, c)
+        do { try fm.moveItem(at: url, to: dest) } catch { NSLog("Shelfie: move failed \(error)"); return nil }
+        return dest
     }
 
-    private func saveToPhotos(_ url: URL) {
+    private func saveToPhotos(_ url: URL, done: @escaping (Bool) -> Void) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            guard status == .authorized || status == .limited else { return }
+            guard status == .authorized || status == .limited else {
+                DispatchQueue.main.async { done(false) }
+                return
+            }
             PHPhotoLibrary.shared().performChanges({
                 PHAssetCreationRequest.creationRequestForAssetFromImage(atFileURL: url)
-            }, completionHandler: nil)
+            }, completionHandler: { ok, _ in DispatchQueue.main.async { done(ok) } })
         }
     }
 
-    /// Screenshots left in the Inbox while the app wasn't running go to Random.
+    /// Screenshots left in the holding folder while the app wasn't running go to the default choice.
+    /// Photos-only files that never made it into Photos go to the Desktop.
     func sweepInbox() {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: Folders.inbox.path)) ?? []
-        for n in names where Watcher.isScreenshot(n) { route(Folders.inbox.appendingPathComponent(n), .random) }
+        let fm = FileManager.default
+        if let h = Folders.holding {
+            let names = (try? fm.contentsOfDirectory(atPath: h.path)) ?? []
+            for n in names where Watcher.isScreenshot(n) { route(h.appendingPathComponent(n), Prefs.shared.fallbackChoice) }
+        }
+        for n in (try? fm.contentsOfDirectory(atPath: Folders.sending.path)) ?? [] where !n.hasPrefix(".") {
+            let u = Folders.sending.appendingPathComponent(n)
+            if let back = move(u, into: Folders.desktop, name: u.deletingPathExtension().lastPathComponent) {
+                Store.shared.add(back, .remember)
+            }
+        }
     }
 }
 
@@ -612,6 +811,9 @@ enum Thumbs {
 
 // MARK: - Shared AppKit pieces
 
+/// A shelf font size, scaled by Settings → Text size.
+func fs(_ size: CGFloat) -> CGFloat { (size * Prefs.shared.textScale).rounded() }
+
 /// Frosted, rounded panel background.
 func makeBackground(radius: CGFloat) -> NSVisualEffectView {
     let v = NSVisualEffectView()
@@ -692,13 +894,19 @@ final class ChoiceBar {
             timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
                 guard let self else { return }
                 if !self.model.hovering { self.model.remaining -= 0.05 / ChoiceBar.seconds }
-                if self.model.remaining <= 0 { self.choose(.random) }
+                if self.model.remaining <= 0 { self.choose(Prefs.shared.fallbackChoice) }
             }
         }
     }
 
     func choose(_ c: Category) {
         guard !batch.isEmpty else { return }
+        if Prefs.shared.needsFolder(c) {
+            // First time using this choice: ask where it goes. Cancel goes back to the bar.
+            unregisterKeys()
+            let ok = Prefs.shared.chooseFolder(for: c)
+            if !ok { model.remaining = 1; registerKeys(); return }
+        }
         timer?.invalidate(); timer = nil
         unregisterKeys()
         for url in batch { Router.shared.route(url, c) }
@@ -707,13 +915,13 @@ final class ChoiceBar {
         hide()
     }
 
-    /// Number keys 1–5 (and Esc for Random) only while the bar is showing.
+    /// Number keys (and Esc for the default) only while the bar is showing.
     private func registerKeys() {
         guard keyIDs.isEmpty else { return }
-        for c in Category.allCases {
+        for c in Category.visible {
             keyIDs.append(HotKeys.shared.register(c.keyCode, 0) { ChoiceBar.shared.choose(c) })
         }
-        keyIDs.append(HotKeys.shared.register(kVK_Escape, 0) { ChoiceBar.shared.choose(.random) })
+        keyIDs.append(HotKeys.shared.register(kVK_Escape, 0) { ChoiceBar.shared.choose(Prefs.shared.fallbackChoice) })
     }
 
     private func unregisterKeys() {
@@ -738,6 +946,7 @@ final class ChoiceBar {
 
 struct ChoiceView: View {
     @ObservedObject var model: ChoiceModel
+    @ObservedObject var prefs = Prefs.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -766,18 +975,20 @@ struct ChoiceView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(model.images.count > 1 ? "Where should these \(model.images.count) screenshots go?" : "Where should this go?").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                     HStack(spacing: 6) {
-                        ForEach(Category.allCases, id: \.self) { c in
+                        ForEach(Category.visible, id: \.self) { c in
                             Button { ChoiceBar.shared.choose(c) } label: {
                                 VStack(spacing: 3) {
                                     Image(systemName: c.icon).font(.system(size: 14)).foregroundStyle(c.color)
-                                    Text(c.title).font(.system(size: 10, weight: .medium))
+                                    Text(c.title).font(.system(size: 10, weight: .medium)).lineLimit(1)
                                     Text("\(c.key)").font(.system(size: 9, weight: .bold, design: .rounded))
                                         .foregroundStyle(.secondary)
                                 }
                                 .frame(width: 60, height: 58)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(c == .random ? 0.12 : 0.06)))
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(c == prefs.fallbackChoice ? 0.12 : 0.06)))
+                                .opacity(prefs.needsFolder(c) ? 0.6 : 1)
                             }
                             .buttonStyle(.plain)
+                            .help(prefs.needsFolder(c) ? "You'll be asked to choose a folder for \(c.title)" : c.title)
                         }
                     }
                 }
@@ -814,9 +1025,26 @@ final class Shelf: NSObject, NSWindowDelegate {
     private var refreshTimer: Timer?
 
     var isVisible: Bool { panel?.isVisible ?? false }
+    /// Keeps the shelf open while a folder picker from Settings is showing.
+    var holdOpen = false
+
+    func rekey() { if isVisible { panel.makeKeyAndOrderFront(nil) } }
+
+    /// Resizes the shelf to the size chosen in Settings, keeping its bottom edge in place.
+    func applySize() {
+        guard let panel else { return }
+        let size = Prefs.shared.shelfDims
+        var f = panel.frame
+        guard f.size != size else { return }
+        let vf = screenUnderMouse().visibleFrame
+        f.origin.y = max(vf.minY + 8, min(f.origin.y, vf.maxY - size.height - 8))
+        f.origin.x = min(max(f.origin.x, vf.minX + 8), vf.maxX - size.width - 8)
+        f.size = size
+        panel.setFrame(f, display: true)
+    }
 
     func setup() {
-        panel = makePanel(size: NSSize(width: 380, height: 560))
+        panel = makePanel(size: Prefs.shared.shelfDims)
         panel.delegate = self
         panel.onCancel = { [weak self] in self?.hide() }
         host(ShelfView(store: Store.shared, ui: ui, prefs: Prefs.shared), in: panel, radius: 14)
@@ -825,6 +1053,7 @@ final class Shelf: NSObject, NSWindowDelegate {
     /// Like a Dock stack: opens just above the Dock, under the mouse.
     func toggleFromDock() {
         if isVisible { hide(); return }
+        applySize()
         let vf = screenUnderMouse().visibleFrame
         let m = NSEvent.mouseLocation
         let w = panel.frame.width, h = panel.frame.height
@@ -833,6 +1062,7 @@ final class Shelf: NSObject, NSWindowDelegate {
     }
 
     func showAtCursor() {
+        applySize()
         let vf = screenUnderMouse().visibleFrame
         let m = NSEvent.mouseLocation
         let w = panel.frame.width, h = panel.frame.height
@@ -870,7 +1100,7 @@ final class Shelf: NSObject, NSWindowDelegate {
         if Date().timeIntervalSince(s) > 0.45 { hide() }
     }
 
-    func windowDidResignKey(_ notification: Notification) { hide() }
+    func windowDidResignKey(_ notification: Notification) { if !holdOpen { hide() } }
 }
 
 /// An AppKit view for each thumbnail, so dragging hands other apps a real file.
@@ -1005,13 +1235,13 @@ struct Tile: View {
     func title(dot: Bool = true, weight: Font.Weight = .regular, size: CGFloat = 11) -> some View {
         HStack(alignment: .top, spacing: 5) {
             if dot { Circle().fill(item.category.color).frame(width: 6, height: 6).padding(.top, size == 11 ? 4 : 5) }
-            Text(item.displayName).font(.system(size: size, weight: weight)).lineLimit(2).truncationMode(.tail)
+            Text(item.displayName).font(.system(size: fs(size), weight: weight)).lineLimit(2).truncationMode(.tail)
         }
     }
 
     func circleButton(_ symbol: String, tint: Color, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(tint)
+            Image(systemName: symbol).font(.system(size: fs(10), weight: .bold)).foregroundStyle(tint)
                 .frame(width: 22, height: 22)
                 .background(Circle().fill(.regularMaterial))
         }
@@ -1029,17 +1259,22 @@ struct ShelfView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Screenshots").font(.system(size: 15, weight: .semibold))
-                Text("\(store.items.count)").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("Screenshots").font(.system(size: fs(15), weight: .semibold))
+                Text("\(store.items.count)").font(.system(size: fs(12))).foregroundStyle(.secondary)
                 Spacer()
-                Button { NSWorkspace.shared.open(Folders.base) } label: { Image(systemName: "folder") }
-                    .buttonStyle(.plain).help("Open the Screenshots folder")
+                Menu {
+                    ForEach(Category.visible.filter { $0 != .remember && Folders.folder($0) != nil }, id: \.self) { c in
+                        Button("\(c.title) folder") { if let u = Folders.folder(c) { NSWorkspace.shared.open(u) } }
+                    }
+                    Button("Desktop") { NSWorkspace.shared.open(Folders.desktop) }
+                } label: { Image(systemName: "folder") }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Open a screenshots folder")
                 Button { ui.showSettings.toggle() } label: { Image(systemName: "gearshape") }
                     .buttonStyle(.plain).help("Settings")
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
 
-            if prefs.folderMissing { missingBanner }
+            if !prefs.missing.isEmpty { missingBanner }
             if !prefs.setUp { setupBanner } else if prefs.desktopFallback { fallbackBanner }
 
             Divider()
@@ -1061,17 +1296,17 @@ struct ShelfView: View {
             Divider()
             footer
         }
-        .frame(width: 380, height: 560)
+        .frame(width: prefs.shelfDims.width, height: prefs.shelfDims.height)
     }
 
     @ViewBuilder
     func section(_ title: String, _ list: [ShelfItem]) -> some View {
         if !list.isEmpty {
-            Text(title.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+            Text(title.uppercased()).font(.system(size: fs(10), weight: .semibold)).foregroundStyle(.secondary)
             if prefs.columns == 1 {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(list.enumerated()), id: \.element.id) { i, item in
-                        Tile(item: item, ui: ui, thumbHeight: 210, style: prefs.rowStyle)
+                        Tile(item: item, ui: ui, thumbHeight: 210 * prefs.shelfDims.width / 380, style: prefs.rowStyle)
                             .padding(.vertical, 7)
                         if prefs.rowStyle == .divider && i < list.count - 1 {
                             Rectangle().fill(Color.primary.opacity(0.18)).frame(height: 1).padding(.horizontal, -14)
@@ -1080,7 +1315,7 @@ struct ShelfView: View {
                 }
             } else {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
-                    ForEach(list) { Tile(item: $0, ui: ui, thumbHeight: 104) }
+                    ForEach(list) { Tile(item: $0, ui: ui, thumbHeight: 104 * prefs.shelfDims.width / 380) }
                 }
             }
         }
@@ -1088,10 +1323,10 @@ struct ShelfView: View {
 
     var setupBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("One-time setup").font(.system(size: 12, weight: .semibold))
-            Text("Send new screenshots to ~/Screenshots/Inbox and turn off the floating thumbnail, so the choice bar appears right away and nothing lands on your Desktop.")
-                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Button("Set up") { Folders.configureScreenshots(); prefs.refreshSetup() }
+            Text("One-time setup").font(.system(size: fs(12), weight: .semibold))
+            Text("Choose or create a holding folder. macOS will save new screenshots there instead of your Desktop, and Shelfie moves each one to where you choose. The floating thumbnail is turned off so the choice bar appears right away.")
+                .font(.system(size: fs(11))).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button("Set up…") { prefs.chooseHolding() }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1100,17 +1335,17 @@ struct ShelfView: View {
 
     var missingBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Your screenshots folder is missing").font(.system(size: 12, weight: .semibold))
-            Text("It was deleted or moved to the Trash, so new screenshots are going straight to your Desktop. Choose a folder to use from now on.")
-                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            let names = prefs.missing.map(\.title).joined(separator: ", ")
+            Text(prefs.missing.count == 1 ? "The \(names) folder is missing" : "Some folders are missing: \(names)")
+                .font(.system(size: fs(12), weight: .semibold))
+            Text("It was deleted or moved to the Trash, so those screenshots are going to your Desktop. Choose a folder to use from now on.")
+                .font(.system(size: fs(11))).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Choose folder…") { prefs.chooseFolder() }
-                Button("Make a new one on the Desktop") {
-                    try? FileManager.default.createDirectory(at: Folders.defaultBase, withIntermediateDirectories: true)
-                    Folders.setBase(Folders.defaultBase); prefs.refreshSetup()
+                ForEach(prefs.missing, id: \.self) { c in
+                    Button(prefs.missing.count == 1 ? "Choose folder…" : "\(c.title)…") { prefs.chooseFolder(for: c) }
                 }
             }
-            .font(.system(size: 11))
+            .font(.system(size: fs(11)))
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1119,10 +1354,12 @@ struct ShelfView: View {
 
     var fallbackBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("macOS is still saving screenshots to your Desktop").font(.system(size: 12, weight: .semibold))
-            Text("Shelfie still catches them, but to keep your Desktop clear, choose the folder once in Apple's screenshot menu: press ⌘⇧5 → Options → Other Location… → open your home folder → Screenshots → Inbox → Choose.")
-                .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Button("Open the Inbox folder in Finder") { NSWorkspace.shared.open(Folders.inbox) }.font(.system(size: 11))
+            Text("macOS is still saving screenshots to your Desktop").font(.system(size: fs(12), weight: .semibold))
+            Text("Shelfie still catches them, but to keep your Desktop clear, confirm the folder once in Apple's screenshot menu: press ⌘⇧5 → Options → Other Location… → choose \(Folders.holding.map(Folders.short) ?? "your holding folder").")
+                .font(.system(size: fs(11))).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let h = Folders.holding {
+                Button("Show the holding folder in Finder") { NSWorkspace.shared.activateFileViewerSelecting([h]) }.font(.system(size: fs(11)))
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1132,10 +1369,10 @@ struct ShelfView: View {
     var empty: some View {
         VStack(spacing: 8) {
             Spacer()
-            Image(systemName: "photo.stack").font(.system(size: 30)).foregroundStyle(.secondary)
-            Text("No screenshots yet").font(.system(size: 13, weight: .medium))
+            Image(systemName: "photo.stack").font(.system(size: fs(30))).foregroundStyle(.secondary)
+            Text("No screenshots yet").font(.system(size: fs(13), weight: .medium))
             Text("Take one with your screenshot shortcut, pick where it goes, and it shows up here.")
-                .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(width: 240)
+                .font(.system(size: fs(11))).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(width: 240)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -1145,8 +1382,8 @@ struct ShelfView: View {
         VStack(alignment: .leading, spacing: 8) {
             Button { ui.showRemoved.toggle() } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: ui.showRemoved ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .bold))
-                    Text("Recently removed (\(store.removed.count))").font(.system(size: 11))
+                    Image(systemName: ui.showRemoved ? "chevron.down" : "chevron.right").font(.system(size: fs(9), weight: .bold))
+                    Text("Recently removed (\(store.removed.count))").font(.system(size: fs(11)))
                 }
                 .foregroundStyle(.secondary)
             }
@@ -1154,14 +1391,14 @@ struct ShelfView: View {
             if ui.showRemoved {
                 ForEach(store.removed.prefix(8)) { item in
                     HStack {
-                        Text(item.displayName).font(.system(size: 11)).lineLimit(1).truncationMode(.tail)
+                        Text(item.displayName).font(.system(size: fs(11))).lineLimit(1).truncationMode(.tail)
                         Spacer()
-                        Button("Restore") { store.restore(item) }.font(.system(size: 11))
+                        Button("Restore") { store.restore(item) }.font(.system(size: fs(11)))
                     }
                 }
             }
             Text("Hold \(prefs.shelfKeyLabel) to peek at the shelf")
-                .font(.system(size: 10)).foregroundStyle(.tertiary)
+                .font(.system(size: fs(10))).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1176,7 +1413,7 @@ struct ShelfView: View {
                         Text("` (backtick)").tag(true)
                     }
                     Text("Plain ` means you can't type a backtick while Shelfie is running.")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .font(.system(size: fs(10))).foregroundStyle(.secondary)
                 }
                 Picker("Screenshots per row", selection: $prefs.columns) {
                     Text("1 (large)").tag(1)
@@ -1188,33 +1425,159 @@ struct ShelfView: View {
                         ForEach(RowStyle.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                 }
+                Picker("Text size", selection: $prefs.textSize) {
+                    ForEach(0..<4) { Text(Prefs.sizeNames[$0]).tag($0) }
+                }
+                Picker("Shelf size", selection: $prefs.shelfSize) {
+                    ForEach(0..<4) { Text(Prefs.sizeNames[$0]).tag($0) }
+                }
                 Toggle("Open at login", isOn: $prefs.atLogin)
                 Divider()
+                ChoicesSettings(prefs: prefs)
+                Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Screenshots save to: \(Folders.screenshotLocation.path.replacingOccurrences(of: Folders.home.path, with: "~"))")
-                        .font(.system(size: 11))
-                    if prefs.setUp {
-                        Button("Restore Apple's defaults (Desktop + floating thumbnail)") {
-                            Folders.configureScreenshots(restore: true); prefs.refreshSetup()
-                        }
-                        .font(.system(size: 11))
-                    }
-                }
-                VStack(alignment: .leading, spacing: 4) {
+                    Text("Holding folder").font(.system(size: fs(12), weight: .semibold))
                     HStack {
-                        Text("Screenshots folder: \(prefs.basePath.replacingOccurrences(of: Folders.home.path, with: "~"))")
-                            .font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
+                        Text(Folders.holding.map(Folders.short) ?? "Not set up yet")
+                            .font(.system(size: fs(11))).lineLimit(1).truncationMode(.middle)
                         Spacer()
-                        Button("Change…") { prefs.chooseFolder() }.font(.system(size: 11))
+                        Button(Folders.holding == nil ? "Set up…" : "Change…") { prefs.chooseHolding() }.font(.system(size: fs(11)))
                     }
-                    Text("Desktop screenshots go loose on the Desktop. Save, Inspiration and Records go into this folder.")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("macOS saves every screenshot as a file before Shelfie can see it. This folder is where they land for a moment, instead of your Desktop, until Shelfie moves each one to where you choose. If Shelfie isn't running, they wait here until it opens.")
+                        .font(.system(size: fs(10))).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if prefs.setUp {
+                        Button("Turn off (back to Apple's defaults: Desktop + floating thumbnail)") {
+                            Folders.configureScreenshots(to: nil); prefs.refreshSetup()
+                        }
+                        .font(.system(size: fs(11)))
+                    } else if Folders.holding != nil {
+                        Text("Off: macOS is saving to \(Folders.short(Folders.screenshotLocation)).")
+                            .font(.system(size: fs(10))).foregroundStyle(.secondary)
+                        Button("Turn on") { if let h = Folders.holding { Folders.configureScreenshots(to: h); prefs.refreshSetup() } }
+                            .font(.system(size: fs(11)))
+                    }
                 }
                 Divider()
                 Button("Quit Shelfie") { NSApp.terminate(nil) }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// Settings → the quick-choice bar's choices. 1 Desktop and 5 Photos are fixed; 2–4 are yours.
+struct ChoicesSettings: View {
+    @ObservedObject var prefs: Prefs
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Where screenshots go").font(.system(size: fs(12), weight: .semibold))
+
+            fixedRow(.remember, "Loose on your Desktop")
+            ForEach(Category.custom, id: \.self) { slotRow($0) }
+            photosRow
+
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("If you don't choose", selection: $prefs.defaultChoice) {
+                    ForEach(Category.visible.filter { !prefs.needsFolder($0) }, id: \.self) { c in
+                        Text("\(c.key)  \(c.title)").tag(c)
+                    }
+                }
+                .font(.system(size: fs(11)))
+                Text("Used after 6 seconds, or when you press Esc.")
+                    .font(.system(size: fs(10))).foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: prefs.slots) { _, _ in
+            // A default that's switched off goes back to the Desktop.
+            if prefs.fallbackChoice != prefs.defaultChoice { prefs.defaultChoice = .remember }
+        }
+    }
+
+    func badge(_ c: Category) -> some View {
+        Text("\(c.key)").font(.system(size: fs(10), weight: .bold, design: .rounded)).foregroundStyle(.secondary)
+            .frame(width: 14)
+    }
+
+    func fixedRow(_ c: Category, _ detail: String) -> some View {
+        HStack(spacing: 8) {
+            badge(c)
+            Image(systemName: c.icon).foregroundStyle(c.color).frame(width: 22)
+            Text(c.title).font(.system(size: fs(12)))
+            Text(detail).font(.system(size: fs(10))).foregroundStyle(.secondary)
+        }
+    }
+
+    func binding(_ c: Category) -> Binding<Slot> {
+        Binding(get: { prefs.slot(c) }, set: { prefs.slots[c.rawValue] = $0 })
+    }
+
+    func slotRow(_ c: Category) -> some View {
+        let s = binding(c)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                badge(c)
+                Menu {
+                    ForEach(Slot.icons, id: \.self) { name in
+                        Button { s.wrappedValue.icon = name } label: { Label(name, systemImage: name).labelStyle(.iconOnly) }
+                    }
+                } label: { Image(systemName: s.wrappedValue.icon).foregroundStyle(c.color) }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 22).help("Choose an icon")
+                TextField("Name", text: s.name).textFieldStyle(.roundedBorder).font(.system(size: fs(12)))
+                Toggle("", isOn: s.on).toggleStyle(.switch).controlSize(.mini).labelsHidden()
+                    .help(s.wrappedValue.on ? "Shown in the choice bar" : "Hidden from the choice bar")
+            }
+            if s.wrappedValue.on {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        folderLabel(c, set: s.wrappedValue.folder != nil)
+                        Spacer()
+                        Button(s.wrappedValue.folder == nil ? "Choose…" : "Change…") { prefs.chooseFolder(for: c) }
+                            .font(.system(size: fs(11)))
+                    }
+                    Toggle("New folder each year (e.g. \(String(Calendar.current.component(.year, from: Date()))))", isOn: s.perYear)
+                        .font(.system(size: fs(10))).controlSize(.mini)
+                }
+                .padding(.leading, 52)
+            }
+        }
+    }
+
+    @ViewBuilder
+    func folderLabel(_ c: Category, set: Bool) -> some View {
+        if let u = Folders.folder(c) {
+            Text(Folders.short(u)).font(.system(size: fs(10))).lineLimit(1).truncationMode(.middle)
+        } else if set {
+            Text("Folder missing, going to Desktop").font(.system(size: fs(10))).foregroundStyle(.red)
+        } else {
+            Text("No folder yet, you'll be asked the first time").font(.system(size: fs(10))).foregroundStyle(.secondary)
+        }
+    }
+
+    var photosRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            fixedRow(.photos, "Adds to Apple Photos")
+            HStack {
+                if prefs.photosKeep == nil {
+                    Text("Also keep the file: no").font(.system(size: fs(10))).foregroundStyle(.secondary)
+                } else {
+                    Text("Also keep the file in:").font(.system(size: fs(10))).foregroundStyle(.secondary)
+                    folderLabel(.photos, set: true)
+                }
+                Spacer()
+                Button(prefs.photosKeep == nil ? "Choose…" : "Change…") { prefs.chooseFolder(for: .photos) }
+                    .font(.system(size: fs(11)))
+                if prefs.photosKeep != nil {
+                    Button("Don't keep") { prefs.photosKeep = nil; prefs.refreshSetup() }.font(.system(size: fs(11)))
+                }
+            }
+            .padding(.leading, 52)
+            if prefs.photosKeep == nil {
+                Text("Once it's in Photos, the file goes to the Trash and doesn't stay on the shelf.")
+                    .font(.system(size: fs(10))).foregroundStyle(.secondary).padding(.leading, 52)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
@@ -1233,11 +1596,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        if Folders.resolveBase() != nil {
-            for c in [Category.inspiration, .random, .records] {
-                try? FileManager.default.createDirectory(at: Folders.destination(c), withIntermediateDirectories: true)
-            }
-        }
+        _ = Prefs.shared  // carries over an older version's folders on first launch
         buildMenu()
         Store.shared.refresh()
         Shelf.shared.setup()
@@ -1246,6 +1605,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         watcher?.start()
         Router.shared.sweepInbox()
         Shelf.shared.toggleFromDock()
+        if CommandLine.arguments.contains("--settings") { Shelf.shared.ui.showSettings = true }  // for testing
     }
 
     /// Clicking the Dock icon opens or closes the shelf.
@@ -1265,17 +1625,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(mi)
         }
         if !menu.items.isEmpty { menu.addItem(.separator()) }
-        let folder = NSMenuItem(title: "Open Screenshots Folder", action: #selector(openFolder), keyEquivalent: "")
-        folder.target = self
-        menu.addItem(folder)
+        for c in Category.visible where c != .remember {
+            guard let u = Folders.folder(c) else { continue }
+            let mi = NSMenuItem(title: "Open \(c.title) Folder", action: #selector(openItem(_:)), keyEquivalent: "")
+            mi.representedObject = u.path
+            mi.target = self
+            menu.addItem(mi)
+        }
         return menu
     }
 
     @objc private func openItem(_ sender: NSMenuItem) {
         if let p = sender.representedObject as? String { NSWorkspace.shared.open(URL(fileURLWithPath: p)) }
     }
-
-    @objc private func openFolder() { NSWorkspace.shared.open(Folders.base) }
 
     private func buildMenu() {
         let main = NSMenu()

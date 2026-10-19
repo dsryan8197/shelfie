@@ -23,7 +23,7 @@ cat > $APP/Contents/Info.plist <<PLIST
   <key>CFBundleExecutable</key><string>Shelfie</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSPhotoLibraryAddUsageDescription</key><string>Shelfie saves screenshots to Photos when you press 5, so they sync to your iPhone.</string>
   <key>NSDesktopFolderUsageDescription</key><string>Shelfie watches for new screenshots and puts "Remember" screenshots on your Desktop.</string>
@@ -46,6 +46,9 @@ if [[ "$1" == "dist" ]]; then
   rm -rf dist/stage
   echo "Made dist/Shelfie.dmg"
 fi
+
+# On GitHub's build machines (CI is set there), stop here: the DMG is what gets published.
+[[ -n "$CI" ]] && exit 0
 
 # Install: move into /Applications so there's only one copy on this Mac.
 pkill -x Shelfie || true

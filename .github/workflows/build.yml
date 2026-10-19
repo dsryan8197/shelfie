@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26 # Shelfie uses Apple's on-device model, which needs the macOS 26 SDK
+    permissions:
+      contents: write # to publish a release when main changes
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swiftc --version
+
+      - name: Build Shelfie.app and Shelfie.dmg
+        run: ./build.sh dist
+
+      - name: Verify bundle
+        run: |
+          test -x Shelfie.app/Contents/MacOS/Shelfie
+          plutil -lint Shelfie.app/Contents/Info.plist
+          codesign --verify --verbose Shelfie.app
+          lipo Shelfie.app/Contents/MacOS/Shelfie -verify_arch arm64 x86_64
+          hdiutil verify dist/Shelfie.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shelfie
+          path: dist/Shelfie.dmg
+
+      # Every update to main becomes the new download behind the README button.
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(plutil -extract CFBundleShortVersionString raw Shelfie.app/Contents/Info.plist)"
+          gh release create "build-$GITHUB_RUN_NUMBER" dist/Shelfie.dmg \
+            --target "$GITHUB_SHA" --latest \
+            --title "Shelfie $version (build $GITHUB_RUN_NUMBER)" --generate-notes
