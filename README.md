@@ -6,6 +6,8 @@
 
 <img src="images/demo.gif" alt="Opening the Shelfie shelf from the Dock and dragging screenshots into an app" width="720">
 
+<img src="images/bar.png" alt="The quick-choice bar: take several in a row, press 1–5 to file locally or save to iCloud, renamed via Apple Intelligence" width="720">
+
 ### [⬇️ Download Shelfie](https://github.com/hi-dad/shelfie/releases/latest/download/Shelfie.dmg)
 Free · macOS 26 or newer · always the latest version
 
