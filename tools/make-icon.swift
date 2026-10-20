@@ -4,7 +4,7 @@
 //   swift tools/make-icon.swift <app> AppIcon.iconset
 //   iconutil -c icns AppIcon.iconset -o AppIcon.icns
 //
-// <app> is one of: window-pane-relief, desktop-cat, copy-collector, shelfie, paperlight, jot
+// <app> is one of: window-pane-relief, desktop-cat, copy-collector, shelfie, paperlight, jot, leftovers
 import AppKit
 
 let args = CommandLine.arguments
@@ -88,13 +88,59 @@ let designs: [String: Design] = [
         p.fill(p.circle(78, 42, 7.5), hex(0xFFFFFF), lift: true)
         p.fill(p.circle(78, 42, 3.2), hex(0x8E7CF5))
     },
-    // A cat sitting in front of a frosted window, with a ball of yarn.
+    // A cute cat face made of frosted glass.
     "desktop-cat": Design(top: 0xFFD08A, bottom: 0xFF8A4C) { p in
-        p.glass(p.rr(16, 22, 72, 52, 10), fill: 0.32)
-        p.symbol("cat.fill", in: CGRect(x: 22, y: 34, width: 50, height: 46), hex(0xFFFFFF), lift: true)
-        p.fill(p.circle(80, 76, 8), hex(0xFFFFFF, 0.95), lift: true)
-        p.ctx.addArc(center: CGPoint(x: 80, y: 76), radius: 4.5, startAngle: 0.6, endAngle: 3.6, clockwise: false)
-        p.ctx.setStrokeColor(hex(0xE8662A, 0.8).cgColor); p.ctx.setLineWidth(1.6); p.ctx.strokePath()
+        func mirror(_ x: CGFloat) -> CGFloat { 104 - x }
+        // Face and ears as one outline, so the glass has a single clean edge.
+        var head: CGPath = CGPath(ellipseIn: CGRect(x: 20, y: 34, width: 64, height: 52), transform: nil)
+        for flip in [false, true] {
+            let x: (CGFloat) -> CGFloat = flip ? mirror : { $0 }
+            let ear = CGMutablePath()
+            ear.move(to: CGPoint(x: x(23), y: 54))
+            ear.addLine(to: CGPoint(x: x(26), y: 22))
+            ear.addQuadCurve(to: CGPoint(x: x(33), y: 20), control: CGPoint(x: x(27), y: 15))
+            ear.addLine(to: CGPoint(x: x(50), y: 38))
+            ear.closeSubpath()
+            head = head.union(ear)
+        }
+        p.glass(head, fill: 0.5, edge: 0.95, width: 1.6)
+        // Inner ears, a soft pink tint.
+        for flip in [false, true] {
+            let x: (CGFloat) -> CGFloat = flip ? mirror : { $0 }
+            let ear = CGMutablePath()
+            ear.move(to: CGPoint(x: x(29), y: 42))
+            ear.addLine(to: CGPoint(x: x(30), y: 28))
+            ear.addQuadCurve(to: CGPoint(x: x(34), y: 27), control: CGPoint(x: x(30.5), y: 24))
+            ear.addLine(to: CGPoint(x: x(44), y: 38))
+            ear.closeSubpath()
+            p.fill(ear, hex(0xFFD2C8, 0.75))
+        }
+        let ink = hex(0xB5470F, 0.85)
+        // Eyes with a glint.
+        for x in [CGFloat(39), 65] {
+            p.fill(CGPath(ellipseIn: CGRect(x: x - 4.4, y: 54, width: 8.8, height: 10.5), transform: nil), ink)
+            p.fill(p.circle(x + 1.5, 57, 1.8), hex(0xFFFFFF, 0.95))
+        }
+        // Cheeks.
+        for x in [CGFloat(30), 74] {
+            p.fill(CGPath(ellipseIn: CGRect(x: x - 5, y: 65, width: 10, height: 5), transform: nil), hex(0xFF8F7A, 0.35))
+        }
+        // Nose and mouth.
+        let nose = CGMutablePath()
+        nose.move(to: CGPoint(x: 48.8, y: 65.5)); nose.addLine(to: CGPoint(x: 55.2, y: 65.5))
+        nose.addQuadCurve(to: CGPoint(x: 52, y: 69.4), control: CGPoint(x: 54.8, y: 68))
+        nose.addQuadCurve(to: CGPoint(x: 48.8, y: 65.5), control: CGPoint(x: 49.2, y: 68))
+        p.fill(nose, hex(0xF06A5A, 0.9))
+        p.ctx.move(to: CGPoint(x: 52, y: 69.2)); p.ctx.addLine(to: CGPoint(x: 52, y: 71.2))
+        p.ctx.move(to: CGPoint(x: 46.8, y: 70.8)); p.ctx.addQuadCurve(to: CGPoint(x: 52, y: 71.2), control: CGPoint(x: 49, y: 74.2))
+        p.ctx.addQuadCurve(to: CGPoint(x: 57.2, y: 70.8), control: CGPoint(x: 55, y: 74.2))
+        p.ctx.setStrokeColor(ink.withAlphaComponent(0.7).cgColor); p.ctx.setLineWidth(1.3)
+        p.ctx.setLineCap(.round); p.ctx.setLineJoin(.round); p.ctx.strokePath()
+        // Whiskers, white like the glass edge.
+        for (dy, endDy) in [(CGFloat(-2), CGFloat(-6)), (0.5, 0.5), (3, 7)] {
+            p.line(34, 68 + dy, 10, 68 + endDy, hex(0xFFFFFF, 0.9), 1.2)
+            p.line(70, 68 + dy, 94, 68 + endDy, hex(0xFFFFFF, 0.9), 1.2)
+        }
     },
     // A pile of copied cards with a count badge.
     "copy-collector": Design(top: 0xA8F0C6, bottom: 0x3FBF9B) { p in
@@ -129,11 +175,32 @@ let designs: [String: Design] = [
             p.line(32, y, 32 + CGFloat(len), y, ink, 2.6)
         }
     },
+    // A takeout box with chopsticks.
+    "leftovers": Design(top: 0xFF9E8F, bottom: 0xD9383F) { p in
+        // Chopsticks behind the box, so the glass frosts over them.
+        p.line(56, 54, 84, 14, hex(0xFFE2B8), 3.2)
+        p.line(63, 56, 92, 20, hex(0xFFE2B8), 3.2)
+        // Wire handle.
+        p.ctx.move(to: CGPoint(x: 36, y: 38)); p.ctx.addQuadCurve(to: CGPoint(x: 68, y: 38), control: CGPoint(x: 52, y: 12))
+        p.ctx.setStrokeColor(hex(0xFFFFFF, 0.9).cgColor); p.ctx.setLineWidth(2); p.ctx.strokePath()
+        // Box: tapered body with a folded top band.
+        let body = CGMutablePath()
+        body.move(to: CGPoint(x: 24, y: 42)); body.addLine(to: CGPoint(x: 80, y: 42))
+        body.addLine(to: CGPoint(x: 72, y: 87)); body.addLine(to: CGPoint(x: 32, y: 87)); body.closeSubpath()
+        p.glass(body, fill: 0.55, edge: 0.95, width: 1.5)
+        let band = CGMutablePath()
+        band.move(to: CGPoint(x: 20, y: 34)); band.addLine(to: CGPoint(x: 84, y: 34))
+        band.addLine(to: CGPoint(x: 80, y: 46)); band.addLine(to: CGPoint(x: 24, y: 46)); band.closeSubpath()
+        p.glass(band, fill: 0.75, edge: 0.95, width: 1.5)
+        // A little red seal on the front.
+        p.ctx.addPath(p.circle(52, 65, 7.5)); p.ctx.setStrokeColor(hex(0xC9303A, 0.7).cgColor); p.ctx.setLineWidth(1.8); p.ctx.strokePath()
+        p.fill(p.circle(52, 65, 3), hex(0xC9303A, 0.7))
+    },
     // A note with bullet points.
-    "jot": Design(top: 0xFFF2A6, bottom: 0xF7C548) { p in
+    "jot": Design(top: 0xFFC2E6, bottom: 0xD46BD8) { p in
         p.glass(p.rr(18, 18, 68, 68, 12), fill: 0.65, width: 1.4, lift: true)
         p.line(18, 31, 86, 31, hex(0xFFFFFF, 0.9), 1.2)
-        let ink = hex(0xC98A0E, 0.85), soft = hex(0xC98A0E, 0.45)
+        let ink = hex(0xA63DB3, 0.85), soft = hex(0xA63DB3, 0.45)
         for (i, len) in [32, 26, 20].enumerated() {
             let y = CGFloat(45 + i * 13)
             p.fill(p.circle(31, y, 3.6), ink)

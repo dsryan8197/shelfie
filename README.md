@@ -1,5 +1,7 @@
 # Shelfie
 
+<img src="images/icon.png" alt="Shelfie app icon" width="128">
+
 *Formerly Screenshot Dock.*
 
 A Mac app that keeps screenshots off your Desktop and one click away in the Dock.
