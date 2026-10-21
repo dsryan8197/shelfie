@@ -1,0 +1,418 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Shelfie ad</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1200px;height:675px;overflow:hidden;background:#000;font-family:-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+#stage{position:relative;width:1200px;height:675px;overflow:hidden;
+  background:radial-gradient(900px 500px at 15% 10%,#b9dcff 0%,transparent 60%),radial-gradient(700px 500px at 90% 100%,#1d4fc4 0%,transparent 70%),linear-gradient(160deg,#8cc6ff 0%,#3f8ef3 55%,#2a62d6 100%)}
+.abs{position:absolute}
+#menubar{left:0;top:0;width:100%;height:26px;background:rgba(255,255,255,.28);backdrop-filter:blur(10px);display:flex;align-items:center;padding:0 16px;gap:18px;font-size:13px;color:#0d2350;font-weight:500}
+#menubar .r{margin-left:auto}
+#dock{left:50%;bottom:10px;transform:translateX(-50%);height:72px;padding:10px 12px;border-radius:22px;background:rgba(255,255,255,.3);border:1px solid rgba(255,255,255,.45);backdrop-filter:blur(14px);display:flex;gap:10px;align-items:center}
+.dicon{width:52px;height:52px;border-radius:13px;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:28px}
+.dicon img{width:52px;height:52px;border-radius:13px}
+.sep{width:1px;height:46px;background:rgba(255,255,255,.6)}
+.dot{position:absolute;bottom:-7px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:2px;background:#0d2350;opacity:.7}
+#caption{left:50%;top:44px;transform:translateX(-50%);padding:10px 22px;border-radius:999px;background:rgba(15,22,40,.82);color:#ffd166;font-size:24px;font-weight:700;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.file{width:96px;text-align:center;color:#fff;font-size:10.5px;line-height:1.25;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.file .pg{width:46px;height:56px;margin:0 auto 4px;background:#fff;border-radius:4px;position:relative;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.25)}
+.file .pg i{position:absolute;inset:7px 6px 14px;border-radius:2px}
+.file .pg b{position:absolute;left:6px;right:6px;bottom:5px;height:4px;background:#e2e6ee;border-radius:2px}
+.win{background:#fff;border-radius:12px;box-shadow:0 24px 60px rgba(0,20,60,.35),0 0 0 1px rgba(0,0,0,.08);overflow:hidden}
+.bar{height:38px;background:#eef1f5;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid #dde2ea}
+.bar i{width:12px;height:12px;border-radius:6px;display:block}
+.url{margin-left:20px;flex:1;height:22px;border-radius:6px;background:#fff;font-size:12px;color:#6b7383;display:flex;align-items:center;padding-left:10px}
+.hero{background:radial-gradient(circle at 70% 30%,#ffe9a8,transparent 55%),linear-gradient(135deg,#f7b267,#f4845f 60%,#e05f5f);display:flex;align-items:center;justify-content:center}
+.mood{background:linear-gradient(135deg,#a18cd1,#fbc2eb);position:relative}
+.mood:before{content:"";position:absolute;left:14%;top:18%;width:38%;height:56%;border-radius:10px;background:rgba(255,255,255,.55)}
+.mood:after{content:"";position:absolute;right:12%;bottom:16%;width:30%;height:30%;border-radius:50%;background:#6c5ce7;opacity:.75}
+.receipt{background:#fafafa;position:relative}
+.receipt:before{content:"";position:absolute;inset:14% 20%;background:repeating-linear-gradient(#fafafa 0 7px,#c9ced8 7px 9px)}
+.mapimg{background:radial-gradient(circle at 30% 60%,#9be7a0 0 18%,transparent 19%),radial-gradient(circle at 75% 35%,#7cc6f0 0 22%,transparent 23%),linear-gradient(135deg,#e7f0dc,#cfe4ef);position:relative}
+.mapimg:after{content:"";position:absolute;left:48%;top:40%;width:14px;height:14px;border-radius:50% 50% 50% 0;background:#e74c3c;transform:rotate(-45deg)}
+.lines div{height:10px;border-radius:5px;background:#e6e9ef;margin:10px 0}
+#choice{width:540px;height:126px;border-radius:16px;background:rgba(32,34,40,.92);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 50px rgba(0,0,0,.4);padding:14px 14px 0;color:#fff}
+#choice .row{display:flex;gap:12px}
+#choice .thumb{width:92px;height:74px;border-radius:9px;border:1px solid rgba(255,255,255,.6);overflow:hidden;flex:none;font-size:34px}
+#choice .q{display:flex;align-items:center;font-size:12.5px;font-weight:600;color:rgba(255,255,255,.6);margin-bottom:8px}
+#choice .tr{margin-left:auto;display:flex;gap:4px;align-items:center;font-size:10px;font-weight:700;padding:3px 6px;border-radius:6px}
+.cards{display:flex;gap:6px}
+.card{width:76px;height:60px;border-radius:9px;background:rgba(255,255,255,.07);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500}
+.card small{font-size:9.5px;font-weight:700;color:rgba(255,255,255,.5)}
+.card.def{background:rgba(255,255,255,.14)}
+.prog{margin-top:10px;height:3px;border-radius:2px;background:#3d8ef5}
+.key{width:110px;height:110px;border-radius:24px;background:linear-gradient(#fdfdfd,#e3e6ec);box-shadow:0 6px 0 #b7bcc8,0 18px 40px rgba(0,0,0,.35);font-size:60px;font-weight:600;color:#1d2433;display:flex;align-items:center;justify-content:center}
+#flash{inset:0;background:#fff}
+#sel{border:1.5px dashed #fff;background:rgba(255,255,255,.12);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+#rename{left:50%;top:50%;transform:translate(-50%,-50%);width:900px;text-align:center}
+.mono{font-family:"SF Mono",Menlo,monospace;font-size:19px;padding:14px 18px;border-radius:10px;display:inline-block}
+.old{background:rgba(15,22,40,.55);color:rgba(255,255,255,.75);position:relative}
+.old s{position:absolute;left:14px;right:14px;top:50%;height:2px;background:#ff6b6b;transform-origin:left}
+.new{background:rgba(15,22,40,.88);color:#fff;border:1px solid #7ee2a8;min-width:420px;text-align:left}
+.arrow{color:#7ee2a8;font-size:30px;margin:12px 0;font-weight:700}
+.dest{margin-top:22px;color:#fff;font-size:17px;font-weight:600;display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.2)}
+#shelf{width:310px;height:380px;border-radius:14px;background:rgba(30,32,38,.94);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 50px rgba(0,0,0,.45);color:#fff;padding:12px;transform-origin:50% 100%}
+#shelf .hd{display:flex;align-items:center;font-size:15px;font-weight:600;padding:2px 2px 10px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:10px}
+#shelf .hd span{margin-left:auto;opacity:.6;font-size:13px;letter-spacing:6px}
+#shelf .lbl{font-size:9.5px;font-weight:700;color:rgba(255,255,255,.45);letter-spacing:.5px;margin:0 2px 8px}
+#shelf .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#shelf .grid>div{height:118px;border-radius:9px;overflow:hidden;font-size:40px;border:1px solid rgba(255,255,255,.15)}
+#msgs{width:400px;height:450px}
+.sunset{background:linear-gradient(180deg,#ff9a8b 0%,#ff6a88 45%,#5b3c88 100%);display:flex;align-items:flex-end;justify-content:center;font-size:30px}
+#dim{inset:0;background:rgba(10,20,45,.6)}
+#cloud{position:absolute;right:-8px;top:-8px;width:26px;height:26px;border-radius:13px;background:#2f8cf6;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);font-size:14px;display:flex;align-items:center;justify-content:center}
+.doc div{height:11px;border-radius:5px;background:#e8ebf0;margin:12px 0}
+.cells{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:#dfe3ea;margin:10px}
+.cells i{background:#fff;height:22px;display:block}
+.cells i:nth-child(-n+6){background:#e9f6ec}
+.chat{padding:16px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.b{max-width:75%;padding:8px 12px;border-radius:16px;line-height:1.3}
+.b.l{background:#e9e9eb;color:#111;align-self:flex-start}
+.b.r{background:#2f8cf6;color:#fff;align-self:flex-end}
+#drop2{align-self:flex-end;width:130px;height:96px;border-radius:14px;overflow:hidden}
+#drop{align-self:flex-end;width:130px;height:96px;border-radius:14px;overflow:hidden;font-size:40px}
+.inp{position:absolute;left:14px;right:14px;bottom:12px;height:30px;border-radius:15px;border:1px solid #d5d9e0;font-size:13px;color:#9aa1ad;display:flex;align-items:center;padding-left:12px}
+#ghost{width:130px;height:96px;border-radius:9px;overflow:hidden;font-size:34px;box-shadow:0 14px 30px rgba(0,0,0,.4)}
+#cursor{width:24px;height:30px;z-index:50}
+#cross{width:26px;height:26px;z-index:50}
+.card svg,.tr svg{display:block}
+#title,#outro{inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+  background:radial-gradient(800px 500px at 50% 35%,#5aa6ff 0%,#2a62d6 70%,#1c46a8 100%)}
+#title img,#outro img{width:150px;height:150px;filter:drop-shadow(0 18px 30px rgba(0,0,0,.3))}
+.big{font-size:84px;font-weight:800;letter-spacing:-2px;margin-top:14px}
+.tag{font-size:28px;font-weight:500;opacity:.92;margin-top:6px}
+.small{font-size:19px;opacity:.85;margin-top:22px;font-weight:500}
+.pill{display:inline-block;margin-top:16px;padding:9px 20px;border-radius:999px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);font-size:18px;font-weight:600}
+</style></head>
+<body>
+<div id="stage">
+  <div id="menubar" class="abs"><b>&#63743;</b><b>Finder</b><span>File</span><span>Edit</span><span>View</span><span class="r">Tue 9:41 PM</span></div>
+  <div id="files"></div>
+
+  <div id="browser" class="abs win" style="left:150px;top:96px;width:620px;height:440px">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><div class="url">cooking.example/lemon-garlic-pasta</div></div>
+    <div style="padding:22px 28px">
+      <div style="font-size:28px;font-weight:800;color:#1d2433">Lemon Garlic Pasta</div>
+      <div style="font-size:13px;color:#7a8291;margin:4px 0 14px">20 minutes · serves 4</div>
+      <div class="hero" style="height:210px;border-radius:12px;font-size:90px">🍝</div>
+      <div class="lines"><div style="width:92%"></div><div style="width:80%"></div></div>
+    </div>
+  </div>
+
+  <div id="photoWin" class="abs win" style="left:330px;top:150px;width:420px;height:300px">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><div class="url">Trip photos</div></div>
+    <div class="sunset" style="margin:14px;height:232px;border-radius:8px;font-size:80px">🏔️</div>
+  </div>
+
+  <div id="docs" class="abs win" style="left:14px;top:34px;width:1172px;height:548px">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><div class="url">Q4 plan – Docs</div></div>
+    <div class="doc" style="padding:30px 60px;width:640px"><div style="width:50%;height:22px;background:#cfd6e2"></div><div></div><div style="width:94%"></div><div style="width:88%"></div><div></div><div style="width:70%"></div><div style="width:96%"></div><div style="width:84%"></div><div style="width:60%"></div><div></div><div style="width:90%"></div><div style="width:76%"></div></div>
+  </div>
+  <div id="sheet" class="abs win" style="left:560px;top:70px;width:600px;height:330px">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><div class="url">Budget.numbers</div></div>
+    <div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+
+  <div id="msgs" class="abs win" style="left:60px;top:80px">
+    <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span style="margin-left:auto;margin-right:auto;font-size:13px;font-weight:600;color:#333">Sam</span></div>
+    <div class="chat">
+      <div class="b l">What are we making tonight?</div>
+      <div class="b r">Found a recipe + the shopping list</div>
+      <div id="drop" class="hero">🍝</div>
+      <div id="drop2" class="receipt"></div>
+      <div id="reply" class="b l">Yum, yes! 😋</div>
+    </div>
+    <div class="inp">iMessage</div>
+  </div>
+
+  <div id="sel" class="abs"></div>
+  <div id="flash" class="abs"></div>
+
+  <div id="dim" class="abs"></div>
+  <div id="choice" class="abs">
+    <div class="row">
+      <div class="thumb hero" id="cthumb">🍝</div>
+      <div style="flex:1">
+        <div class="q">Where should this go?<span class="tr" id="trashBtn"><svg width="11" height="12" viewBox="0 0 11 12"><path d="M1 3h9M4 3V1.5h3V3M2 3l.7 8h5.6L9 3" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>6</span></div>
+        <div class="cards" id="cards"></div>
+      </div>
+    </div>
+    <div class="prog" id="prog"></div>
+  </div>
+
+  <div id="key" class="abs key">3</div>
+
+  <div id="rename" class="abs">
+    <div class="mono old" id="oldname">Screenshot 2026-10-21 at 9.41.12 PM.png<s id="strike"></s></div>
+    <div class="arrow">↓</div>
+    <div class="mono new" id="newname"></div>
+    <div><div class="dest" id="dest">✨ Filed in <b>Inspiration</b></div></div>
+  </div>
+
+  <div id="shelf" class="abs">
+    <div class="hd">Screenshots<span>▢ ⚙</span></div>
+    <div class="lbl">RECENT</div>
+    <div class="grid">
+      <div class="hero" id="s1" style="display:flex;align-items:center;justify-content:center">🍝</div>
+      <div class="mood"></div>
+      <div class="mapimg"></div>
+      <div class="receipt" id="s4"></div>
+    </div>
+  </div>
+
+  <div id="ghost" class="abs hero" style="display:flex;align-items:center;justify-content:center">🍝</div>
+  <div id="fly" class="abs" style="width:92px;height:74px;border-radius:9px;border:1px solid #fff;overflow:hidden"></div>
+
+  <div id="dock" class="abs">
+    <div class="dicon" style="background:linear-gradient(#6ec3ff,#1f7ff0)">🙂</div>
+    <div class="dicon" style="background:linear-gradient(#fff,#e8eef8)">🧭</div>
+    <div class="dicon" id="dMsgs" style="background:linear-gradient(#6ee27a,#2fbf45)">💬</div>
+    <div class="dicon" style="background:linear-gradient(#fff6c8,#ffd84d)">📝</div>
+    <div class="dicon" id="dPhotos" style="background:#fff">🌸<div id="cloud"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M4 11h8.5a3 3 0 0 0 .3-6A4.5 4.5 0 0 0 4.2 4 3.5 3.5 0 0 0 4 11z" fill="#fff"/></svg></div></div>
+    <div class="dicon" id="dShelf"><img src="../../images/icon.png"><div class="dot"></div></div>
+    <div class="sep"></div>
+    <div class="dicon" id="dTrash" style="background:rgba(255,255,255,.55)">🗑️</div>
+  </div>
+
+  <div id="caption" class="abs"></div>
+
+  <svg id="cursor" class="abs" viewBox="0 0 24 30"><path d="M2 2v22l6-6 4 9 4-2-4-8.5h8.5z" fill="#111" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+  <svg id="cross" class="abs" viewBox="0 0 26 26"><path d="M13 1v24M1 13h24" stroke="#fff" stroke-width="3"/><path d="M13 1v24M1 13h24" stroke="#111" stroke-width="1.2"/></svg>
+
+  <div id="title" class="abs"><img src="../../images/icon.png"><div class="big">Shelfie</div><div class="tag">Quick access to your screenshots.</div></div>
+  <div id="outro" class="abs"><img src="../../images/icon.png"><div class="big">Shelfie</div><div class="tag">Every screenshot, right where it belongs.</div><div class="pill">Free for Mac · github.com/hi-dad/shelfie</div></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const io = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const out = (x) => 1 - Math.pow(1 - x, 3);
+const back = (x) => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, x) => a + (b - a) * x;
+// fade in over [a,a+d], out over [b-d,b]
+const win = (t, a, b, d = .35) => Math.min(seg(t, a, a + d), 1 - seg(t, b - d, b));
+const css = (el, o) => Object.assign(el.style, o);
+
+// ---- choice cards
+const ico = {
+  desk: '<svg width="18" height="16" viewBox="0 0 18 16"><rect x="1" y="1" width="16" height="10" rx="2" fill="#f5a623"/><path d="M6 15h6M9 11v4" stroke="#f5a623" stroke-width="2"/></svg>',
+  save: '<svg width="18" height="16" viewBox="0 0 18 16"><path d="M1 9v5h16V9h-5l-1 2H7L6 9z" fill="#3d8ef5"/><path d="M9 1v7M6 5l3 3 3-3" stroke="#3d8ef5" stroke-width="2" fill="none"/></svg>',
+  insp: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1c.6 4 2 5.4 6 6-4 .6-5.4 2-6 6-.6-4-2-5.4-6-6 4-.6 5.4-2 6-6z" fill="#c86bfa"/><circle cx="15" cy="14" r="1.6" fill="#c86bfa"/></svg>',
+  rec: '<svg width="16" height="18" viewBox="0 0 16 18"><path d="M2 1h8l4 4v12H2z" fill="#34c759"/><path d="M5 9h6M5 12h6" stroke="#fff" stroke-width="1.4"/></svg>',
+  pho: '<svg width="20" height="16" viewBox="0 0 20 16"><rect x="1" y="1" width="18" height="14" rx="3" fill="none" stroke="#ff4f7b" stroke-width="2"/><path d="M4 12l4-4 3 3 2-2 3 3" stroke="#ff4f7b" stroke-width="2" fill="none"/></svg>'
+};
+const cards = [['desk', 'Desktop'], ['save', 'Save'], ['insp', 'Inspiration'], ['rec', 'Records'], ['pho', 'Photos']];
+$('cards').innerHTML = cards.map(([k, n], i) => `<div class="card${i == 1 ? ' def' : ''}" id="c${i + 1}">${ico[k]}<span>${n}</span><small>${i + 1}</small></div>`).join('');
+
+// ---- messy desktop files
+const fills = ['linear-gradient(135deg,#f7b267,#e05f5f)', 'linear-gradient(135deg,#a18cd1,#fbc2eb)', 'linear-gradient(135deg,#84fab0,#8fd3f4)', '#d9dee8', 'linear-gradient(135deg,#ffecd2,#fcb69f)', 'linear-gradient(135deg,#667eea,#764ba2)'];
+const files = [];
+for (let i = 0; i < 20; i++) {
+  const col = i % 5, row = Math.floor(i / 5);
+  const d = document.createElement('div');
+  d.className = 'file abs';
+  const x = 1084 - row * 106 + ((i * 37) % 13) - 6, y = 46 + col * 90 + ((i * 53) % 11) - 5;
+  d.dataset.x = x; d.dataset.y = y;
+  d.innerHTML = `<div class="pg"><i style="background:${fills[i % 6]}"></i><b></b></div>Screenshot 2026-10-${String(10 + i).padStart(2, '0')} at ${1 + i % 11}.${String(10 + i * 3).slice(-2)}.0${i % 9} PM`;
+  $('files').appendChild(d); files.push(d);
+}
+
+const caps = [
+  [3.0, 6.6, 'Screenshots pile up on your Desktop…'],
+  [6.6, 12.4, 'Take one. Press 1–5 to choose where it goes.'],
+  [12.4, 15.6, 'Automatic renaming'],
+  [15.6, 18.4, 'Oops? Press 6 and it’s in the Trash.'],
+  [18.4, 20.8, 'Press 5 to save it to iCloud Photos.'],
+  [20.8, 26.6, 'Desktop covered? Your screenshots are in the Dock.'],
+];
+const cardColor = ['#f5a623', '#3d8ef5', '#c86bfa', '#34c759', '#ff4f7b'];
+
+let C = null;
+function centers() {
+  if (C) return C;
+  const r = (el) => { const b = el.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+  C = { shelf: r($('dShelf')), trash: r($('dTrash')), photos: r($('dPhotos')) };
+  return C;
+}
+
+// keyframed path: [[t,x,y],...]
+function path(t, k) {
+  if (t <= k[0][0]) return [k[0][1], k[0][2]];
+  for (let i = 1; i < k.length; i++) if (t <= k[i][0]) {
+    const x = io(seg(t, k[i - 1][0], k[i][0]));
+    return [lerp(k[i - 1][1], k[i][1], x), lerp(k[i - 1][2], k[i][2], x)];
+  }
+  const l = k[k.length - 1]; return [l[1], l[2]];
+}
+
+// The three times the choice bar shows: [mode, in, out, key press time, key]
+const bars = [
+  { mode: 'recipe', a: 8.6, b: 12.1, press: 11.15, key: '3', card: 3 },
+  { mode: 'oops', a: 16.4, b: 17.7, press: 17.2, key: '6', card: 0 },
+  { mode: 'photo', a: 19.25, b: 20.3, press: 19.9, key: '5', card: 5 },
+];
+const BX = 636, BY = 445;  // choice bar's resting top-left
+
+function render(t) {
+  const c = centers();
+  // title & outro
+  css($('title'), { opacity: 1 - seg(t, 2.6, 3.1), display: t < 3.1 ? 'flex' : 'none' });
+  const ti = back(seg(t, .1, .8));
+  $('title').querySelector('img').style.transform = `scale(${ti}) rotate(${(1 - ti) * -10}deg)`;
+  $('title').querySelector('.big').style.cssText = `opacity:${seg(t, .5, 1)};transform:translateY(${(1 - out(seg(t, .5, 1))) * 20}px)`;
+  $('title').querySelector('.tag').style.cssText = `opacity:${seg(t, .9, 1.4)}`;
+  css($('outro'), { opacity: seg(t, 26.6, 27.2), display: t > 26.6 ? 'flex' : 'none' });
+  const oi = back(seg(t, 26.8, 27.5));
+  $('outro').querySelector('img').style.transform = `scale(${oi})`;
+  $('outro').querySelector('.big').style.opacity = seg(t, 27.2, 27.7);
+  $('outro').querySelector('.tag').style.opacity = seg(t, 27.6, 28.1);
+  $('outro').querySelector('.pill').style.cssText = `opacity:${seg(t, 28.0, 28.5)};transform:translateY(${(1 - out(seg(t, 28.0, 28.5))) * 14}px)`;
+
+  // caption
+  const cap = caps.find(([a, b]) => t >= a && t < b);
+  if (cap) { $('caption').textContent = cap[2]; css($('caption'), { opacity: win(t, cap[0], cap[1], .3), display: 'block' }); }
+  else css($('caption'), { display: 'none' });
+
+  // desktop files: appear 3.3.., then get pulled into the Shelfie dock icon 5.9..6.7
+  files.forEach((f, i) => {
+    const a = 3.3 + i * .12, p = back(seg(t, a, a + .3));
+    const s = io(seg(t, 5.9 + (i % 5) * .05, 6.6 + (i % 5) * .05));
+    const x = lerp(+f.dataset.x, c.shelf[0] - 48, s), y = lerp(+f.dataset.y, c.shelf[1] - 40, s);
+    css(f, { left: x + 'px', top: y + 'px', opacity: t < a ? 0 : (1 - s * s), transform: `scale(${p * (1 - .8 * s)})` });
+  });
+  const bump = Math.sin(seg(t, 6.4, 7.0) * Math.PI) * .18 + Math.sin(seg(t, 21.6, 21.9) * Math.PI) * -.12;
+  $('dShelf').style.transform = `scale(${1 + bump}) translateY(${-bump * 40}px)`;
+
+  // browser (6.6..12.4)
+  const bw = win(t, 6.6, 12.4, .4);
+  css($('browser'), { opacity: bw, transform: `scale(${.96 + .04 * out(bw)})`, display: bw > 0 ? 'block' : 'none' });
+  // sunset photo window (18.4..20.8)
+  const pw = win(t, 18.4, 20.8, .35);
+  css($('photoWin'), { opacity: pw, transform: `scale(${.96 + .04 * out(pw)})`, display: pw > 0 ? 'block' : 'none' });
+
+  // selections: recipe, accidental, sunset
+  let selShow = 0, sx = 0, sy = 0, sw = 0, sh = 0;
+  if (t > 7.5 && t < 8.4) { const g = io(seg(t, 7.5, 8.3)); sx = 180; sy = 222; sw = 560 * g; sh = 212 * g; selShow = 1; }
+  if (t > 15.9 && t < 16.3) { const g = io(seg(t, 15.9, 16.25)); sx = 640; sy = 300; sw = 120 * g; sh = 70 * g; selShow = 1; }
+  if (t > 18.8 && t < 19.15) { const g = io(seg(t, 18.8, 19.1)); sx = 352; sy = 210; sw = 376 * g; sh = 206 * g; selShow = 1; }
+  css($('sel'), { left: sx + 'px', top: sy + 'px', width: sw + 'px', height: sh + 'px', opacity: selShow });
+  const fl = [8.4, 16.3, 19.15].reduce((m, f) => Math.max(m, t >= f ? .85 * (1 - seg(t, f, f + .35)) : 0), 0);
+  css($('flash'), { opacity: fl });
+
+  // crosshair vs cursor
+  const crossOn = (t > 7.1 && t < 8.4) || (t > 15.7 && t < 16.3) || (t > 18.6 && t < 19.15);
+  const d1 = [c.shelf[0] - 82, c.shelf[1] - 330], d2 = [c.shelf[0] + 70, c.shelf[1] - 200], chat = [330, 330];
+  const cp = path(t, [[6.9, 520, 470], [7.5, 180, 222], [8.3, 740, 434], [8.6, 740, 434], [9.2, 740, 600], [15.6, 900, 420], [15.9, 640, 300], [16.25, 760, 370], [18.5, 760, 370],
+    [18.8, 352, 210], [19.1, 728, 416], [20.8, 728, 416],
+    [21.4, c.shelf[0], c.shelf[1]], [21.9, c.shelf[0], c.shelf[1]], [22.4, ...d1], [22.6, ...d1], [23.3, ...chat], [23.5, ...chat], [24.0, ...d2], [24.2, ...d2], [24.9, ...chat], [25.1, ...chat], [26, 640, 420]]);
+  css($('cross'), { left: cp[0] - 13 + 'px', top: cp[1] - 13 + 'px', opacity: crossOn ? 1 : 0 });
+  const curOn = (t > 6.8 && t < 7.1) || (t > 8.5 && t < 9.2) || (t > 11.9 && t < 12.4) || (t > 15.5 && t < 15.7) || (t > 16.3 && t < 18.6) || (t > 19.15 && t < 26.6);
+  css($('cursor'), { left: cp[0] - 3 + 'px', top: cp[1] - 3 + 'px', opacity: curOn ? 1 : 0 });
+
+  // choice bar
+  const bar = bars.find((b) => t > b.a - .01 && t < b.b + .4) || bars[0];
+  const cIn = seg(t, bar.a, bar.a + .4), cOut = seg(t, bar.b, bar.b + .35);
+  const cv = out(cIn) * (1 - cOut);
+  // the recipe bar zooms up to the middle so you can see it close up
+  const zs = bar.mode === 'recipe' ? io(seg(t, 9.2, 9.7)) * (1 - io(seg(t, 11.6, 12.0))) : 0;
+  css($('choice'), { left: BX + 'px', top: BY + (1 - out(cIn)) * 30 + 'px', opacity: cv, display: cv > 0 ? 'block' : 'none',
+    transform: `translate(${-306 * zs}px,${-190 * zs}px) scale(${1 + .9 * zs})` });
+  css($('dim'), { opacity: zs * .9, display: zs > 0 ? 'block' : 'none' });
+  const th = $('cthumb');
+  if (bar.mode === 'recipe') { th.className = 'thumb hero'; th.textContent = '🍝'; th.style.background = ''; }
+  else if (bar.mode === 'oops') { th.className = 'thumb'; th.textContent = ''; th.style.background = 'linear-gradient(160deg,#8cc6ff,#3f8ef3)'; }
+  else { th.className = 'thumb sunset'; th.textContent = '🏔️'; th.style.background = ''; }
+  $('prog').style.width = (1 - seg(t, bar.a + .3, bar.press) * .3) * 100 + '%';
+  // each choice glows in turn, then the chosen one lights up
+  for (let i = 1; i <= 5; i++) {
+    let g = bar.mode === 'recipe' ? Math.sin(seg(t, 9.75 + (i - 1) * .22, 9.75 + (i - 1) * .22 + .45) * Math.PI) : 0;
+    if (g < .02) g = 0;
+    const chosen = bar.card === i && t > bar.press;
+    const el = $('c' + i), col = cardColor[i - 1];
+    el.style.background = chosen ? col + '88' : g > 0 ? `rgba(255,255,255,${.07 + .12 * g})` : '';
+    el.style.boxShadow = g > 0 || chosen ? `0 0 ${18 * (chosen ? 1 : g)}px ${col}, inset 0 0 0 1.5px ${col}` : '';
+    el.style.transform = `translateY(${-6 * g}px) scale(${1 + .06 * g - (chosen && t < bar.press + .2 ? .05 : 0)})`;
+  }
+  const press6 = bar.mode === 'oops' && t > bar.press;
+  css($('trashBtn'), { background: press6 ? 'rgba(255,90,90,.85)' : 'transparent', color: press6 ? '#fff' : 'rgba(255,255,255,.6)' });
+
+  // big keycap
+  const kA = bar.press - .25;
+  const kOn = win(t, kA, bar.press + .6, .2);
+  const kp = back(seg(t, kA, kA + .25));
+  $('key').textContent = bar.key;
+  const pressed = t > bar.press && t < bar.press + .2;
+  const kx = bar.mode === 'recipe' ? 545 : 820, ky = bar.mode === 'recipe' ? 462 : 300;
+  css($('key'), { left: kx + 'px', top: ky + 'px', opacity: kOn, transform: `scale(${kp * (pressed ? .92 : 1)}) translateY(${pressed ? 5 : 0}px)` });
+
+  // rename card 12.4..15.6
+  const rv = win(t, 12.4, 15.6, .4);
+  css($('rename'), { opacity: rv, display: rv > 0 ? 'block' : 'none' });
+  $('strike').style.transform = `scaleX(${io(seg(t, 12.9, 13.3))})`;
+  $('oldname').style.opacity = 1 - .45 * seg(t, 12.9, 13.3);
+  const nn = 'Lemon Garlic Pasta – Oct 21, 9.41 PM.png';
+  const n = Math.round(nn.length * seg(t, 13.3, 14.4));
+  $('newname').textContent = nn.slice(0, n) + (t > 13.3 && t < 14.6 && Math.floor(t * 4) % 2 ? '▍' : '');
+  $('dest').style.opacity = seg(t, 14.5, 14.9);
+
+  // thumbnail flies to the Trash (17.5-18.2) or to Photos (20.1-20.7)
+  const toTrash = t < 19, fa = toTrash ? 17.5 : 20.1, fb = toTrash ? 18.2 : 20.7, tgt = toTrash ? c.trash : c.photos;
+  const fs = io(seg(t, fa, fb));
+  const fly = $('fly');
+  fly.className = toTrash ? 'abs' : 'abs sunset';
+  fly.textContent = toTrash ? '' : '🏔️';
+  fly.style.background = toTrash ? 'linear-gradient(160deg,#8cc6ff,#3f8ef3)' : '';
+  css(fly, { display: t > fa && t < fb + .05 ? 'flex' : 'none', left: lerp(BX + 14, tgt[0] - 46, fs) + 'px', top: lerp(BY + 14, tgt[1] - 37, fs) + 'px',
+    transform: `scale(${1 - .8 * fs}) rotate(${fs * (toTrash ? 20 : -10)}deg)`, opacity: 1 - fs * .3 });
+  const tb = Math.sin(seg(t, 18.15, 18.55) * Math.PI) * .22;
+  $('dTrash').style.transform = `scale(${1 + tb}) translateY(${-tb * 30}px)`;
+  const pb = Math.sin(seg(t, 20.65, 21.05) * Math.PI) * .22;
+  $('dPhotos').style.transform = `scale(${1 + pb}) translateY(${-pb * 30}px)`;
+  const cb = back(seg(t, 20.65, 20.95)) * (1 - seg(t, 22.2, 22.5));
+  css($('cloud'), { opacity: Math.min(1, cb), transform: `scale(${cb})` });
+
+  // busy screen: windows cover the Desktop (20.8..26.6)
+  const bz = win(t, 20.8, 26.6, .4);
+  css($('docs'), { opacity: bz, display: bz > 0 ? 'block' : 'none', transform: `scale(${.97 + .03 * out(bz)})` });
+  const bz2 = win(t, 20.95, 26.6, .4);
+  css($('sheet'), { opacity: bz2, display: bz2 > 0 ? 'block' : 'none', transform: `translateY(${(1 - out(bz2)) * 20}px)` });
+  const mw = win(t, 21.1, 26.6, .4);
+  css($('msgs'), { opacity: mw, display: mw > 0 ? 'block' : 'none', transform: `translateY(${(1 - out(seg(t, 21.1, 21.5))) * 20}px)` });
+  const dp1 = back(seg(t, 23.35, 23.65)), dp2 = back(seg(t, 24.95, 25.25));
+  css($('drop'), { display: t > 23.35 ? 'flex' : 'none', transform: `scale(${dp1})` });
+  css($('drop2'), { display: t > 24.95 ? 'block' : 'none', transform: `scale(${dp2})` });
+  css($('reply'), { opacity: seg(t, 25.5, 25.8), display: t > 25.5 ? 'block' : 'none' });
+
+  // shelf popover 21.8..26.1
+  const sv = back(seg(t, 21.8, 22.15)) * (1 - seg(t, 25.8, 26.1));
+  css($('shelf'), { left: c.shelf[0] - 155 + 'px', top: c.shelf[1] - 36 - 380 - 8 + 'px', opacity: Math.min(1, sv), transform: `scale(${.6 + .4 * sv})`, display: sv > 0.01 ? 'block' : 'none' });
+  $('s1').style.opacity = t > 22.6 ? .25 : 1;
+  $('s4').style.opacity = t > 24.2 ? .25 : 1;
+
+  // drag ghosts 22.6..23.35 and 24.2..24.95
+  const g1 = t > 22.6 && t < 23.4, g2 = t > 24.2 && t < 25.0;
+  const gh = $('ghost');
+  gh.className = g2 ? 'abs receipt' : 'abs hero';
+  gh.textContent = g2 ? '' : '🍝';
+  css(gh, { display: g1 || g2 ? 'flex' : 'none', left: cp[0] - 50 + 'px', top: cp[1] - 40 + 'px', transform: 'rotate(-4deg)', opacity: .95 });
+}
+
+// ?stamp shows the time in the corner, for reviewing
+if (location.search.includes('stamp')) {
+  const st = document.createElement('div');
+  st.style.cssText = 'position:absolute;right:12px;bottom:12px;z-index:99;padding:5px 10px;border-radius:8px;background:rgba(0,0,0,.7);color:#fff;font:600 20px Menlo,monospace';
+  document.getElementById('stage').appendChild(st);
+  const r0 = render;
+  render = (t) => { r0(t); st.textContent = '0:' + String(Math.floor(t)).padStart(2, '0') + '.' + Math.floor((t % 1) * 10); };
+}
+window.renderAt = (t) => render(t);
+document.body.dataset.ready = '1';
+if (!location.search.includes('capture')) {
+  const s = performance.now();
+  const loop = () => { render(((performance.now() - s) / 1000) % 30); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
+</script>
+</body></html>
