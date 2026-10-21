@@ -4,7 +4,7 @@
 
 **A Mac app that keeps screenshots off your Desktop: pick where each one goes the moment you take it, and grab recent ones from the Dock.**
 
-<img src="images/demo.gif" alt="Opening the Shelfie shelf from the Dock and dragging screenshots into an app" width="720">
+<img src="images/ad.gif" alt="Shelfie ad: screenshots pile up on the Desktop; take one and press 1–5 to choose where it goes; automatic renaming; press 6 to trash an accidental one or 5 to save to iCloud Photos; open recent screenshots from the Dock even when windows cover the Desktop" width="720">
 
 <img src="images/bar.png" alt="The quick-choice bar: take several in a row, press 1–5 to file locally or save to iCloud, renamed via Apple Intelligence" width="720">
 
