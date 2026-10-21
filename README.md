@@ -19,7 +19,7 @@ Free · macOS 26 or newer · always the latest version
 
 ## How to use it
 
-- **Take a screenshot** and a little bar appears: press **1–5** to choose where it goes (Desktop, your own folders, or Apple Photos). Do nothing and it goes to your default.
+- **Take a screenshot** and a little bar appears: press **1–5** to choose where it goes (Desktop, your own folders, or Apple Photos). Press **6** to send an accidental one to the Trash. Do nothing and it goes to your default.
 - **Click Shelfie in the Dock** for a shelf of recent screenshots. Drag one straight into any app.
 - **Readable names:** each screenshot is renamed from what's in it, on your Mac.
 - **Make it yours** in Settings: rename keys 2–4, pick icons and folders, choose the default, and set the text and shelf size.

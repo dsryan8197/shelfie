@@ -18,8 +18,6 @@ struct Slot: Codable, Equatable {
     var icon: String
     /// Bookmark to the folder. nil until they choose one (they're asked the first time they use it).
     var folder: Data?
-    /// File into a sub-folder per year, like records/2026.
-    var perYear = false
     var on = true
 
     static let icons = ["tray.and.arrow.down.fill", "sparkles", "doc.text.fill", "folder.fill", "star.fill",
@@ -30,7 +28,7 @@ struct Slot: Codable, Equatable {
     static func starter(_ c: Category) -> Slot {
         switch c {
         case .inspiration: return Slot(name: "Inspiration", icon: "sparkles")
-        case .records: return Slot(name: "Records", icon: "doc.text.fill", perYear: true)
+        case .records: return Slot(name: "Records", icon: "doc.text.fill")
         default: return Slot(name: "Save", icon: "tray.and.arrow.down.fill")
         }
     }
@@ -124,9 +122,6 @@ enum Folders {
             Prefs.shared.refreshSetup()
             return desktop
         }
-        if c.slot?.perYear == true {
-            return dir.appendingPathComponent("\(Calendar.current.component(.year, from: Date()))")
-        }
         return dir
     }
 
@@ -204,7 +199,6 @@ final class Store: ObservableObject {
 
     @Published var items: [ShelfItem] = []
     @Published var removed: [ShelfItem] = []
-    @Published var unseen = 0 { didSet { NSApp.dockTile.badgeLabel = unseen > 0 ? "\(unseen)" : nil } }
 
     private struct Saved: Codable { var items: [ShelfItem]; var removed: [ShelfItem] }
     private let file: URL = {
@@ -232,7 +226,6 @@ final class Store: ObservableObject {
         let item = ShelfItem(path: url.path, bookmark: try? url.bookmarkData(), category: c,
                              pinned: false, added: Date())
         items.insert(item, at: 0)
-        if !Shelf.shared.isVisible { unseen += 1 }
         save()
     }
 
@@ -366,7 +359,7 @@ final class Prefs: ObservableObject {
     @Published var desktopFallback = false
     /// Choices whose folder was deleted or trashed, so their screenshots are going to the Desktop.
     @Published var missing: [Category] = [] {
-        didSet { if !missing.isEmpty { NSApp.dockTile.badgeLabel = "!" } else if Store.shared.unseen == 0 { NSApp.dockTile.badgeLabel = nil } }
+        didSet { NSApp.dockTile.badgeLabel = missing.isEmpty ? nil : "!" }
     }
 
     /// Shelf text size: 0 small, 1 medium, 2 large, 3 extra large.
@@ -915,12 +908,24 @@ final class ChoiceBar {
         hide()
     }
 
+    /// Key 6: a screenshot taken by accident goes straight to the Trash (so it can still be put back).
+    func discard() {
+        guard !batch.isEmpty else { return }
+        timer?.invalidate(); timer = nil
+        unregisterKeys()
+        NSWorkspace.shared.recycle(batch) { _, _ in }
+        batch = []
+        model.images = []
+        hide()
+    }
+
     /// Number keys (and Esc for the default) only while the bar is showing.
     private func registerKeys() {
         guard keyIDs.isEmpty else { return }
         for c in Category.visible {
             keyIDs.append(HotKeys.shared.register(c.keyCode, 0) { ChoiceBar.shared.choose(c) })
         }
+        keyIDs.append(HotKeys.shared.register(kVK_ANSI_6, 0) { ChoiceBar.shared.discard() })
         keyIDs.append(HotKeys.shared.register(kVK_Escape, 0) { ChoiceBar.shared.choose(Prefs.shared.fallbackChoice) })
     }
 
@@ -973,7 +978,19 @@ struct ChoiceView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(model.images.count > 1 ? "Where should these \(model.images.count) screenshots go?" : "Where should this go?").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                    HStack {
+                        Text(model.images.count > 1 ? "Where should these \(model.images.count) screenshots go?" : "Where should this go?").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                        Spacer()
+                        Button { ChoiceBar.shared.discard() } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "trash").font(.system(size: 10))
+                                Text("6").font(.system(size: 9, weight: .bold, design: .rounded))
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help(model.images.count > 1 ? "Discard these screenshots (move to Trash)" : "Discard this screenshot (move to Trash)")
+                    }
                     HStack(spacing: 6) {
                         ForEach(Category.visible, id: \.self) { c in
                             Button { ChoiceBar.shared.choose(c) } label: {
@@ -1073,7 +1090,6 @@ final class Shelf: NSObject, NSWindowDelegate {
 
     private func show(at origin: NSPoint, height: CGFloat) {
         Store.shared.refresh()
-        Store.shared.unseen = 0
         Prefs.shared.refreshSetup()
         panel.setFrameOrigin(origin)
         panel.makeKeyAndOrderFront(nil)
@@ -1260,7 +1276,6 @@ struct ShelfView: View {
         VStack(spacing: 0) {
             HStack {
                 Text("Screenshots").font(.system(size: fs(15), weight: .semibold))
-                Text("\(store.items.count)").font(.system(size: fs(12))).foregroundStyle(.secondary)
                 Spacer()
                 Menu {
                     ForEach(Category.visible.filter { $0 != .remember && Folders.folder($0) != nil }, id: \.self) { c in
@@ -1324,7 +1339,7 @@ struct ShelfView: View {
     var setupBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("One-time setup").font(.system(size: fs(12), weight: .semibold))
-            Text("Choose or create a holding folder. macOS will save new screenshots there instead of your Desktop, and Shelfie moves each one to where you choose. The floating thumbnail is turned off so the choice bar appears right away.")
+            Text("Choose or create a holding folder. macOS will save new screenshots there temporarily, instead of your Desktop, and Shelfie moves each one to where you choose. This turns off the floating thumbnail so Shelfie's choice bar appears right away.")
                 .font(.system(size: fs(11))).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button("Set up…") { prefs.chooseHolding() }
         }
@@ -1536,8 +1551,6 @@ struct ChoicesSettings: View {
                         Button(s.wrappedValue.folder == nil ? "Choose…" : "Change…") { prefs.chooseFolder(for: c) }
                             .font(.system(size: fs(11)))
                     }
-                    Toggle("New folder each year (e.g. \(String(Calendar.current.component(.year, from: Date()))))", isOn: s.perYear)
-                        .font(.system(size: fs(10))).controlSize(.mini)
                 }
                 .padding(.leading, 52)
             }
@@ -1558,18 +1571,20 @@ struct ChoicesSettings: View {
     var photosRow: some View {
         VStack(alignment: .leading, spacing: 4) {
             fixedRow(.photos, "Adds to Apple Photos")
-            HStack {
-                if prefs.photosKeep == nil {
-                    Text("Also keep the file: no").font(.system(size: fs(10))).foregroundStyle(.secondary)
-                } else {
-                    Text("Also keep the file in:").font(.system(size: fs(10))).foregroundStyle(.secondary)
-                    folderLabel(.photos, set: true)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text(prefs.photosKeep == nil ? "Also keep in: no folder" : "Also keep in:")
+                        .font(.system(size: fs(10))).foregroundStyle(.secondary).fixedSize()
+                    if prefs.photosKeep != nil { folderLabel(.photos, set: true) }
                 }
-                Spacer()
-                Button(prefs.photosKeep == nil ? "Choose…" : "Change…") { prefs.chooseFolder(for: .photos) }
-                    .font(.system(size: fs(11)))
-                if prefs.photosKeep != nil {
-                    Button("Don't keep") { prefs.photosKeep = nil; prefs.refreshSetup() }.font(.system(size: fs(11)))
+                HStack {
+                    Spacer()
+                    if prefs.photosKeep != nil {
+                        Button("Don't keep") { prefs.photosKeep = nil; prefs.refreshSetup() }
+                            .font(.system(size: fs(11))).fixedSize()
+                    }
+                    Button(prefs.photosKeep == nil ? "Choose…" : "Change…") { prefs.chooseFolder(for: .photos) }
+                        .font(.system(size: fs(11))).fixedSize()
                 }
             }
             .padding(.leading, 52)
