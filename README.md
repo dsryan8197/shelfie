@@ -11,10 +11,15 @@
 ### [⬇️ Download Shelfie](https://github.com/hi-dad/shelfie/releases/latest/download/Shelfie.dmg)
 Free · macOS 26 or newer · always the latest version
 
+⚠️ **The first time you open it, macOS blocks it.** That's normal for free apps outside the App Store. [See step 2 below](#install) for the one click that lets it open.
+
 ## Install
 
 1. Open **Shelfie.dmg** and drag Shelfie into **Applications**.
 2. Open it. When macOS says it can't verify the app, click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway** (once).
+
+   <img src="images/open-anyway.png" alt="System Settings, Privacy and Security: the line saying Shelfie was blocked to protect your Mac, with the Open Anyway button next to it" width="600">
+
 3. In the shelf, click **Set up…** and choose or create an empty **holding folder**. New screenshots wait there for a moment while Shelfie files them.
 
 ## How to use it
