@@ -31,7 +31,11 @@ cat > $APP/Contents/Info.plist <<PLIST
 PLIST
 # Sign with the same local certificate every time so macOS keeps Shelfie's permissions across rebuilds.
 # (Falls back to ad-hoc signing on a Mac without it; then permissions must be re-granted after each build.)
-if security find-certificate -c "Daniel Ryan Local Signing" >/dev/null 2>&1; then
+# GitHub's release builds sign with Developer ID + hardened runtime + timestamp, as Apple's notarization needs.
+# Shelfie.entitlements lets the hardened app ask for Photos access.
+if [[ -n "$SIGN_IDENTITY" ]]; then
+  codesign --force --sign "$SIGN_IDENTITY" --options runtime --timestamp --entitlements Shelfie.entitlements $APP
+elif security find-certificate -c "Daniel Ryan Local Signing" >/dev/null 2>&1; then
   codesign --force --sign "Daniel Ryan Local Signing" $APP
 else
   codesign --force --sign - $APP
